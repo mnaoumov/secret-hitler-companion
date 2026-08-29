@@ -136,7 +136,7 @@ export function findLies(params: FindLiesParams): LieFinding[] {
   ) {
     lies.push({
       actor: 'chancellor',
-      description: `holding ${formatHand(chancellorFascistCount, PASS_SIZE)} he could not have enacted the ${describePolicy(enacted)} that is on the table`
+      description: `holding ${formatHand(chancellorFascistCount, PASS_SIZE)} he could not have enacted the ${describePolicy(enacted)} law that is on the table`
     });
   }
 
@@ -148,7 +148,7 @@ export function findLies(params: FindLiesParams): LieFinding[] {
   if (enacted !== undefined && claimedPass !== undefined && !canEnactFromClaimedPass(claimedPass, enacted)) {
     lies.push({
       actor: 'president',
-      description: `passing ${formatHand(claimedPass, PASS_SIZE)} he could not have produced the ${describePolicy(enacted)} that is on the table`
+      description: `passing ${formatHand(claimedPass, PASS_SIZE)} he could not have produced the ${describePolicy(enacted)} law that is on the table`
     });
   } else if (
     enacted !== undefined
@@ -158,7 +158,7 @@ export function findLies(params: FindLiesParams): LieFinding[] {
   ) {
     lies.push({
       actor: 'president',
-      description: `drawing ${formatHand(presidentFascistCount, DRAW_SIZE)} he could not have passed on the ${describePolicy(enacted)} that is on the table`
+      description: `drawing ${formatHand(presidentFascistCount, DRAW_SIZE)} he could not have passed on the ${describePolicy(enacted)} law that is on the table`
     });
   }
 

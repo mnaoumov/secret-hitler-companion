@@ -947,6 +947,11 @@ button.is-claimed {
   margin-left: 0;
 }
 
+/* A question mark per card nobody accounted for, so the gap has the shape of the hand. */
+.claim__unknown {
+  color: var(--muted);
+}
+
 .claim__aside {
   color: var(--muted);
   margin: 0 0.15em;
@@ -1001,6 +1006,18 @@ button.is-claimed {
   align-items: stretch;
   display: flex;
   gap: 0.5em;
+}
+
+.history__assume-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15em;
+}
+
+.history__claim-line {
+  align-items: baseline;
+  display: flex;
+  gap: 0.3em;
 }
 
 .history__assume {

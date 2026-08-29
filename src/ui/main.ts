@@ -353,7 +353,7 @@ function describeImpossiblePass(view: ReadoutView | undefined): string {
     const hand = formatHand(view.chancellorClaim, PASS_SIZE);
     const colour = view.enacted === Policy.Fascist ? 'Fascist' : 'Liberal';
 
-    return `holding ${hand} he had no ${colour} policy to enact`;
+    return `holding ${hand} he had no ${colour} law to enact`;
   }
 
   if (view.presidentClaim !== undefined && !areClaimsConsistent(view.presidentClaim, view.chancellorClaim)) {
@@ -395,15 +395,15 @@ function describeMissingFields(analysis: GameAnalysis): string | undefined {
 
     if (state.draft.isVetoed === true) {
       return isChaosImminent(analysis) && state.draft.forcedEnactment === undefined
-        ? 'Which policy came off the top?'
+        ? 'Which law came off the top?'
         : undefined;
     }
 
-    return state.draft.enacted === undefined ? 'Which policy was enacted?' : undefined;
+    return state.draft.enacted === undefined ? 'Which law was enacted?' : undefined;
   }
 
   if (isChaosImminent(analysis) && state.draft.forcedEnactment === undefined) {
-    return 'Which policy came off the top?';
+    return 'Which law came off the top?';
   }
 
   return undefined;
@@ -887,22 +887,26 @@ function renderAssumption(index: number, round: Round): HTMLElement {
   );
 
   /*
-   * Say outright which one he claimed, rather than leaving it to the marker alone. The toggles start
-   * with every consistent hand switched on, so "three of them lit" is the resting state and carries
-   * no information about what was said — and when he said nothing at all, an unmarked strip looks
-   * exactly the same as one whose marker was missed.
+   * The claim is named on its own line above the toggles, in the President's colour.
+   *
+   * It has to be stated rather than left to the marker: the toggles start with every consistent hand
+   * switched on, so a lit strip is the resting state and says nothing about what was claimed, and a
+   * round where nobody claimed anything looked exactly like one whose marker had been missed. It
+   * says "President" rather than "he" because the line sits under a row naming two men.
    */
-  const claim = round.presidentClaim === undefined
-    ? [element('span', { className: 'history__assume-label', text: 'he said nothing' })]
-    : [
-      element('span', { className: 'history__assume-label', text: 'he said' }),
-      element('span', { className: 'claim__value' }, renderHand(round.presidentClaim, DRAW_SIZE))
-    ];
+  const claimLine = element('div', { className: 'history__claim-line' }, [
+    element('span', { className: 'history__assume-label is-president', text: 'President\'s claim' }),
+    ...(round.presidentClaim === undefined
+      ? [element('span', { className: 'claim__value claim__unknown', text: '?'.repeat(DRAW_SIZE) })]
+      : [element('span', { className: 'claim__value' }, renderHand(round.presidentClaim, DRAW_SIZE))])
+  ]);
 
-  return element('div', { className: 'history__assume' }, [
-    ...claim,
-    element('span', { className: 'history__assume-label', text: 'assume' }),
-    ...toggles
+  return element('div', { className: 'history__assume-group' }, [
+    claimLine,
+    element('div', { className: 'history__assume' }, [
+      element('span', { className: 'history__assume-label', text: 'assume' }),
+      ...toggles
+    ])
   ]);
 }
 
@@ -970,7 +974,7 @@ function renderChancellorClaimField(): HTMLElement {
   );
 
   return element('div', { className: 'field field--optional' }, [
-    element('span', { className: 'field__label is-chancellor', text: 'Chancellor claims received' }),
+    element('span', { className: 'field__label is-chancellor', text: 'Chancellor claims received laws' }),
     ...buttons,
     ...renderChancellorDiscard()
   ]);
@@ -983,7 +987,7 @@ function renderChancellorClaimField(): HTMLElement {
  */
 function renderChancellorDiscard(): HTMLElement[] {
   if (state.draft.isVetoed === true) {
-    return [element('span', { className: 'deck__note' }, renderPhrase('vetoed — he discarded both'))];
+    return [element('span', { className: 'deck__note' }, renderPhrase('vetoed — he discarded both laws'))];
   }
 
   const discarded = getChancellorDiscard(state.draft.chancellorClaim, state.draft.enacted);
@@ -996,7 +1000,7 @@ function renderChancellorDiscard(): HTMLElement[] {
     'span',
     { className: 'deck__note' },
     renderPhrase(
-      `so he discarded the ${discarded === Policy.Fascist ? 'Fascist' : 'Liberal'}`
+      `so he discarded the ${discarded === Policy.Fascist ? 'Fascist' : 'Liberal'} law`
     )
   )];
 }
@@ -1053,7 +1057,7 @@ function renderClaims(round: Round): HTMLElement[] {
       'span',
       { className: 'claim__value' },
       round.presidentClaim === undefined
-        ? [element('span', { text: '\u2014' })]
+        ? [element('span', { className: 'claim__unknown', text: '?'.repeat(DRAW_SIZE) })]
         : renderHand(round.presidentClaim, DRAW_SIZE)
     ),
     ...(round.presidentDiscard === undefined
@@ -1070,7 +1074,7 @@ function renderClaims(round: Round): HTMLElement[] {
       'span',
       { className: 'claim__value' },
       round.chancellorClaim === undefined
-        ? [element('span', { text: '\u2014' })]
+        ? [element('span', { className: 'claim__unknown', text: '?'.repeat(PASS_SIZE) })]
         : renderHand(round.chancellorClaim, PASS_SIZE)
     ),
     ...(chancellorDiscard === undefined
@@ -2142,7 +2146,7 @@ function renderPresidentClaimField(): HTMLElement {
   );
 
   return element('div', { className: 'field field--optional' }, [
-    element('span', { className: 'field__label is-president', text: 'President claims received' }),
+    element('span', { className: 'field__label is-president', text: 'President claims received laws' }),
     ...buttons
   ]);
 }
@@ -2178,7 +2182,7 @@ function renderPresidentDiscardField(): HTMLElement {
   const passed = getClaimedPassFascistCount(claim, state.draft.presidentDiscard);
 
   return element('div', { className: 'field field--optional' }, [
-    element('span', { className: 'field__label is-president', text: 'President claims discarded' }),
+    element('span', { className: 'field__label is-president', text: 'President claims discarded law' }),
     ...buttons,
     ...(passed === undefined
       ? []
@@ -2224,7 +2228,7 @@ function renderReadout(view: ReadoutView | undefined): HTMLElement {
   if (!view?.enacted) {
     panel.append(element('p', {
       className: 'empty',
-      text: 'Tap the enacted policy to narrow this down to what he actually held.'
+      text: 'Tap the enacted law to narrow this down to what he actually held.'
     }));
 
     return panel;
