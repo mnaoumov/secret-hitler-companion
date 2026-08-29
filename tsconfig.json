@@ -1,0 +1,34 @@
+{
+  "extends": "@tsconfig/strictest/tsconfig.json",
+  "compilerOptions": {
+    "allowArbitraryExtensions": true,
+    "allowImportingTsExtensions": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "importHelpers": true,
+    "inlineSourceMap": true,
+    "inlineSources": true,
+    "lib": [
+      "DOM",
+      "ES2024"
+    ],
+    "libReplacement": true,
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "noEmit": true,
+    "skipLibCheck": false,
+    "target": "ES2024",
+    "types": [
+      "@total-typescript/ts-reset",
+      "node"
+    ],
+    "verbatimModuleSyntax": true
+  },
+  "include": [
+    "./commitlint.config.ts",
+    "./eslint.config.mts",
+    "./scripts/**/*.ts",
+    "./src/**/*.ts",
+    "./vitest.config.ts"
+  ]
+}

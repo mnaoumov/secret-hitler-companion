@@ -1,0 +1,6 @@
+{
+  "skip": [
+    "127\\.0\\.0\\.1:4173",
+    "mnaoumov\\.github\\.io/secret-hitler-companion"
+  ]
+}

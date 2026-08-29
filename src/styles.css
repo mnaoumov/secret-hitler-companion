@@ -1,0 +1,1014 @@
+/*
+ * Sized for a screen the whole table reads at two to three metres, or a tablet passed around.
+ * Type scales with the viewport rather than sitting at a fixed pixel size, so the same page is
+ * legible cast to a television and usable in the hand.
+ */
+
+:root {
+  --accent: #b4462f;
+  --border: #d9d2c7;
+  --chancellor: #1f6f7a;
+  --fascist: #b4462f;
+  --forced: #1f7a4d;
+  --impossible: #b4462f;
+  --liberal: #3d6ea8;
+  --muted: #6d6459;
+  --panel: #f2ede4;
+  --president: #6b4fa8;
+  --surface: #fbf8f2;
+  --text: #221e1a;
+  --weird: #a8721a;
+
+  /* One step drives every size on the page. */
+  --step: clamp(15px, 1.35vw + 0.55vh, 30px);
+
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --accent: #e0705a;
+    --border: #3a352f;
+    --chancellor: #5fbcc9;
+    --fascist: #e0705a;
+    --forced: #4fbc85;
+    --impossible: #e0705a;
+    --liberal: #7aa8dd;
+    --muted: #9a9083;
+    --panel: #1c1a17;
+    --president: #a98fe0;
+    --surface: #131211;
+    --text: #ece5da;
+    --weird: #d5a04a;
+  }
+}
+
+:root[data-theme='dark'] {
+  --accent: #e0705a;
+  --border: #3a352f;
+  --chancellor: #5fbcc9;
+  --fascist: #e0705a;
+  --forced: #4fbc85;
+  --impossible: #e0705a;
+  --liberal: #7aa8dd;
+  --muted: #9a9083;
+  --panel: #1c1a17;
+  --president: #a98fe0;
+  --surface: #131211;
+  --text: #ece5da;
+  --weird: #d5a04a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background: var(--surface);
+  color: var(--text);
+  font-family: ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace;
+  font-size: var(--step);
+  line-height: 1.35;
+  margin: 0;
+  overflow: hidden;
+}
+
+/*
+ * A flex column rather than a fixed grid: the number of rows varies with what the game is doing —
+ * the players bar, an open dossier, the name editor, a victory banner — and a three-slot grid put
+ * the extras into implicit rows on top of the entry panel.
+ */
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+}
+
+#app > * {
+  flex: 0 0 auto;
+}
+
+/*
+ * Must out-specify `#app > *` above, which is an id selector and therefore wins over a bare class.
+ * Without this the main split took its full content height instead of absorbing the slack, and the
+ * history was pushed off the bottom of a viewport that does not scroll.
+ */
+#app > .main,
+#app > .setup {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* ---------- header ---------- */
+
+.board {
+  align-items: center;
+  border-bottom: 2px solid var(--border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5em 1em;
+  padding: 0.5em 0.9em;
+}
+
+/*
+ * The title yields first. It is the one thing in the header that carries no information, so on a
+ * narrow screen it shrinks and truncates rather than pushing the tracks and the buttons onto a
+ * second line and eating a whole row of a viewport that has none to spare.
+ */
+.board__title {
+  /*
+   * A zero basis, not `auto`: wrapping is decided on each item's hypothetical size, so a title
+   * measured at its full text length pushes the buttons onto a second row before anything gets a
+   * chance to shrink. At zero it never causes the break and simply grows into what is left over.
+   */
+  flex: 1 1 0;
+  font-size: 1.1em;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  margin-right: auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.track {
+  align-items: center;
+  display: flex;
+  gap: 0.35em;
+}
+
+.track__label {
+  color: var(--muted);
+  font-size: 0.8em;
+  letter-spacing: 0.08em;
+}
+
+.pip {
+  border: 2px solid var(--border);
+  border-radius: 50%;
+  height: 0.85em;
+  width: 0.85em;
+}
+
+.pip--liberal {
+  background: var(--liberal);
+  border-color: var(--liberal);
+}
+
+.pip--fascist {
+  background: var(--fascist);
+  border-color: var(--fascist);
+}
+
+.pip--tracker {
+  background: var(--muted);
+  border-color: var(--muted);
+}
+
+/* ---------- setup ---------- */
+
+.setup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+  overflow-y: auto;
+  padding: 1em;
+}
+
+.setup__seats {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4em;
+}
+
+.setup__seat {
+  align-items: center;
+  display: flex;
+  gap: 0.4em;
+}
+
+.setup__index {
+  color: var(--muted);
+  flex: 0 0 2.5em;
+  font-weight: 700;
+}
+
+.setup__name {
+  background: var(--panel);
+  border: 2px solid var(--border);
+  border-radius: 0.3em;
+  color: var(--text);
+  font: inherit;
+  min-height: 2em;
+  padding: 0.2em 0.6em;
+  width: 12em;
+}
+
+.setup__name:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+/* ---------- players bar and dossier ---------- */
+
+.players {
+  align-items: center;
+  border-bottom: 2px solid var(--border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4em;
+  padding: 0.4em 0.9em;
+}
+
+.chip {
+  font-size: 0.9em;
+  min-height: 1.8em;
+  padding: 0.15em 0.6em;
+}
+
+/* Only shown before the first round, so a little extra width in the bar is affordable. */
+.move {
+  font-size: 0.8em;
+  min-height: 1.8em;
+  min-width: 1.6em;
+  padding: 0.1em 0.3em;
+}
+
+.chip--dead {
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+
+.dossier {
+  border-bottom: 2px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  font-size: 0.85em;
+  gap: 0.15em;
+  padding: 0.5em 0.9em;
+}
+
+.dossier__header {
+  align-items: center;
+  display: flex;
+  gap: 0.5em;
+  margin-bottom: 0.2em;
+}
+
+.dossier__name {
+  font-size: 1.2em;
+  font-weight: 700;
+}
+
+.dossier__rename {
+  background: var(--panel);
+  border: 2px solid var(--border);
+  border-radius: 0.3em;
+  color: var(--text);
+  font: inherit;
+  font-size: 1.1em;
+  font-weight: 700;
+  min-height: 1.9em;
+  padding: 0.1em 0.5em;
+  width: 9em;
+}
+
+.dossier__rename:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.seat {
+  font-size: 1.1em;
+  font-weight: 700;
+}
+
+.dossier__proof {
+  color: var(--forced);
+}
+
+.dossier__dead {
+  color: var(--impossible);
+}
+
+.dossier__claim {
+  color: var(--muted);
+}
+
+/* ---------- victory ---------- */
+
+.victory {
+  border-bottom: 2px solid var(--border);
+  font-size: 1.2em;
+  padding: 0.5em 0.9em;
+}
+
+.victory--fascist {
+  background: var(--fascist);
+  color: #fff;
+}
+
+.victory--liberal {
+  background: var(--liberal);
+  color: #fff;
+}
+
+/* ---------- name editor ---------- */
+
+.names {
+  align-items: center;
+  border-bottom: 2px solid var(--border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4em;
+  padding: 0.5em 0.9em;
+}
+
+.names__seat {
+  align-items: center;
+  display: flex;
+  gap: 0.25em;
+}
+
+.names__index {
+  color: var(--muted);
+  font-size: 0.8em;
+}
+
+.names__input {
+  background: var(--panel);
+  border: 2px solid var(--border);
+  border-radius: 0.3em;
+  color: var(--text);
+  font: inherit;
+  min-height: 2em;
+  padding: 0.25em 0.5em;
+  width: 7em;
+}
+
+.names__input:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+/* ---------- main ---------- */
+
+/*
+ * Stacked, not side by side.
+ *
+ * Two columns cost the entry form half the width, which is exactly what it could not spare: the
+ * rows wrapped, the panel overflowed, and it needed a scrollbar of its own to reach the button at
+ * the bottom. Full width fits every row on one line, and the odds — which are read, not operated —
+ * sit underneath.
+ *
+ * One scroll region rather than two: a page with a scrolling panel inside a scrolling panel is a
+ * good way to lose a control on a screen being passed around a table.
+ */
+.main {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/*
+ * Each panel takes its natural height instead of being squeezed to fit. Flex children shrink by
+ * default, which compressed the form until its own content overflowed it — the scrolling belongs to
+ * `.main`, and it can only do the job if the panels stop pretending to fit.
+ */
+.main > .panel {
+  flex: 0 0 auto;
+}
+
+.panel {
+  min-height: 0;
+  padding: 0.7em 0.9em;
+}
+
+.panel--readout {
+  overflow: visible;
+}
+
+.panel--entry {
+  border-bottom: 2px solid var(--border);
+  display: flex;
+  flex-direction: column;
+}
+
+.entry__fields {
+  overflow: visible;
+}
+
+.panel--entry /*
+ * A fixed slot for the tick or cross, so recording a vote never resizes the button. The label and
+ * the mark are separate spans; only the slot is width-constrained, and it is wide enough for the
+ * fallback glyphs the monospace face does not cover.
+ */
+.vote {
+  align-items: baseline;
+  display: inline-flex;
+  gap: 0.15em;
+}
+
+.vote__mark {
+  display: inline-block;
+  text-align: center;
+  width: 1.1em;
+}
+
+.button--wide {
+  flex: 0 0 auto;
+}
+
+/*
+ * The outstanding requirement is a label, not a control. Making it look like a button invited taps
+ * on something that was never going to do anything.
+ */
+.entry__commit {
+  align-items: center;
+  border-top: 2px solid var(--border);
+  display: flex;
+  flex: 0 0 auto;
+  gap: 0.6em;
+  justify-content: space-between;
+  margin-top: 0.4em;
+  padding-top: 0.5em;
+}
+
+.entry__missing {
+  color: var(--muted);
+  font-size: 0.85em;
+}
+
+.entry__ready {
+  color: var(--forced);
+  font-size: 0.85em;
+}
+
+.panel__heading {
+  color: var(--muted);
+  font-size: 0.8em;
+  letter-spacing: 0.12em;
+  margin: 0 0 0.5em;
+  text-transform: uppercase;
+}
+
+/* ---------- entry controls ---------- */
+
+.field {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4em;
+  margin-bottom: 0.5em;
+}
+
+/*
+ * Wide enough for "Chancellor" on one line. A narrower column wrapped the label and left any
+ * trailing decoration stranded on a line of its own, which read as a stray mark.
+ */
+/*
+ * A fixed column, so every row's buttons start at the same x — at a table the eye finds the row by
+ * its label and the thumb finds the button by its position, and a ragged left edge breaks the
+ * second.
+ */
+.field__label {
+  color: var(--muted);
+  flex: 0 0 7em;
+  font-size: 0.85em;
+}
+
+/*
+ * The three claim rows say a whole sentence, which will not fit that column at any width worth
+ * paying for: widening it to hold "Chancellor claims received" pushed the seven-seat vote row onto
+ * two lines and moved every button people had learned to aim at. So those labels take a line of
+ * their own and hand the full width back to the buttons.
+ */
+.field--stacked .field__label {
+  flex: 1 0 100%;
+}
+
+/* Optional fields are marked by a lighter label, not by a glyph that can wrap away from it. */
+.field--optional .field__label {
+  opacity: 0.65;
+}
+
+button {
+  background: var(--panel);
+  border: 2px solid var(--border);
+  border-radius: 0.3em;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  min-height: 2em;
+  min-width: 2.4em;
+  padding: 0.25em 0.7em;
+}
+
+button:hover {
+  border-color: var(--muted);
+}
+
+/*
+ * A disabled control has to read as disabled. Without this the greyed-out look was carried only by
+ * `.is-ineligible`, so anything gated by sequence — `vote done` before everyone has voted, the
+ * Chancellor row before a President is picked — looked live and simply did nothing when tapped.
+ */
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+
+button:disabled:hover {
+  border-color: var(--border);
+}
+
+/*
+ * Ineligible seats stay on screen rather than disappearing. A row that silently loses a button is
+ * disorienting mid-game, and the point is to show *why* someone cannot be nominated.
+ */
+button.is-ineligible {
+  border-style: dashed;
+  cursor: not-allowed;
+  opacity: 0.4;
+  text-decoration: line-through;
+}
+
+button.is-ineligible:hover {
+  border-color: var(--border);
+}
+
+button[aria-pressed='true'] {
+  background: var(--text);
+  border-color: var(--text);
+  color: var(--surface);
+}
+
+button.is-fascist[aria-pressed='true'] {
+  background: var(--fascist);
+  border-color: var(--fascist);
+  color: #fff;
+}
+
+button.is-liberal[aria-pressed='true'] {
+  background: var(--liberal);
+  border-color: var(--liberal);
+  color: #fff;
+}
+
+.button--wide {
+  flex: 1 1 auto;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  margin-top: 0.3em;
+  padding: 0.5em;
+  text-transform: uppercase;
+}
+
+/* ---------- readout ---------- */
+
+.deck {
+  align-items: baseline;
+  border: 2px solid var(--border);
+  border-radius: 0.3em;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6em;
+  margin-bottom: 0.6em;
+  padding: 0.4em 0.6em;
+}
+
+.deck__count {
+  font-size: 1.5em;
+  font-weight: 700;
+}
+
+.deck__note {
+  color: var(--muted);
+  font-size: 0.8em;
+}
+
+.deck__note--exact {
+  color: var(--forced);
+}
+
+.deck__options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5em;
+}
+
+.deck__option {
+  align-items: baseline;
+  display: flex;
+  gap: 0.25em;
+}
+
+.deck__composition {
+  font-weight: 700;
+}
+
+.deck__weight {
+  color: var(--muted);
+  font-size: 0.8em;
+}
+
+.claim {
+  margin-bottom: 0.6em;
+}
+
+.claim__title {
+  font-size: 0.9em;
+  margin-bottom: 0.2em;
+  overflow-wrap: anywhere;
+}
+
+table {
+  border-collapse: collapse;
+  table-layout: fixed;
+  width: 100%;
+}
+
+/*
+ * Headers wrap rather than push the table past the panel edge. A right-aligned header that cannot
+ * wrap will run off the screen instead of shrinking, which is how "GIVEN THE FASCIST" escaped.
+ */
+th {
+  color: var(--muted);
+  font-size: 0.75em;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  overflow-wrap: anywhere;
+  text-align: right;
+  text-transform: uppercase;
+}
+
+th:first-child,
+td:first-child {
+  text-align: left;
+}
+
+td {
+  font-variant-numeric: tabular-nums;
+  padding: 0.1em 0;
+  text-align: right;
+}
+
+tr.is-claimed td {
+  font-weight: 700;
+}
+
+tr.is-claimed td:first-child::before {
+  content: '▸ ';
+  color: var(--accent);
+}
+
+.verdict {
+  border-radius: 0.25em;
+  font-size: 0.75em;
+  letter-spacing: 0.08em;
+  padding: 0.1em 0.45em;
+  text-transform: uppercase;
+}
+
+.verdict--forced {
+  background: var(--forced);
+  color: #fff;
+}
+
+.verdict--impossible {
+  background: var(--impossible);
+  color: #fff;
+}
+
+.verdict--possible {
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.alert {
+  border-left: 4px solid var(--impossible);
+  color: var(--impossible);
+  font-size: 0.85em;
+  margin-bottom: 0.4em;
+  padding: 0.2em 0.6em;
+}
+
+/*
+ * Deliberately not styled like an alert. A contradiction proves someone lied; this only says the
+ * story needs an odd choice, which is a prompt to ask a question rather than a finding.
+ */
+.weird {
+  border-left: 4px solid var(--weird);
+  font-size: 0.85em;
+  margin-bottom: 0.4em;
+  padding: 0.2em 0.6em;
+}
+
+.weird__badge {
+  background: var(--weird);
+  border-radius: 0.25em;
+  color: var(--surface);
+  font-size: 0.85em;
+  letter-spacing: 0.08em;
+  padding: 0.05em 0.4em;
+  text-transform: uppercase;
+}
+
+.empty {
+  color: var(--muted);
+  font-size: 0.85em;
+}
+
+/* ---------- history ---------- */
+
+/*
+ * Reference material, opened a few times a game, so it is laid over the page rather than given a
+ * permanent band of a viewport that has none to spare.
+ */
+.overlay {
+  align-items: center;
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 1em;
+  position: fixed;
+  z-index: 10;
+}
+
+/*
+ * A button rather than a bare div so that tapping outside dismisses the panel: it is focusable and
+ * reachable from a keyboard, and the panel sitting on top of it means panel taps never reach here.
+ */
+.overlay__scrim {
+  background: #000;
+  border: none;
+  cursor: pointer;
+  inset: 0;
+  opacity: 0.45;
+  padding: 0;
+  position: absolute;
+}
+
+.overlay__panel {
+  background: var(--panel);
+  border: 2px solid var(--border);
+  border-radius: 0.4em;
+  box-shadow: 0 1em 3em rgb(0 0 0 / 35%);
+  max-height: 100%;
+  max-width: 100%;
+  padding: 0.6em 0.9em;
+  position: relative;
+}
+
+.history {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3em;
+  overflow: auto;
+}
+
+.history__legend {
+  color: var(--muted);
+  font-size: 0.7em;
+}
+
+.history__cards {
+  display: flex;
+  gap: 0.5em;
+  overflow-x: auto;
+  padding-bottom: 0.3em;
+}
+
+.history__round {
+  border: 2px solid var(--border);
+  border-radius: 0.3em;
+  flex: 0 0 auto;
+  font-size: 0.8em;
+  min-width: 9em;
+  padding: 0.35em 0.5em;
+}
+
+.history__round--flagged {
+  border-color: var(--impossible);
+}
+
+.history__round--weird {
+  border-color: var(--weird);
+}
+
+.history__round--latest {
+  box-shadow: 0 0 0 2px var(--forced);
+}
+
+.history__round--selected {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+/* The summary is a button so it is reachable by keyboard, but it must not look like one. */
+.history__summary {
+  background: none;
+  border: none;
+  border-radius: 0;
+  display: block;
+  font: inherit;
+  min-height: 0;
+  padding: 0;
+  text-align: left;
+  width: 100%;
+}
+
+.history__summary:hover {
+  border: none;
+}
+
+.history__summary[aria-pressed='true'] {
+  background: none;
+  color: inherit;
+}
+
+/* ---------- legend ---------- */
+
+.legend {
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.75em;
+  margin-top: 0.5em;
+  padding-top: 0.4em;
+}
+
+.legend strong {
+  color: var(--text);
+}
+
+.history__index {
+  color: var(--muted);
+  letter-spacing: 0.08em;
+}
+
+.history__seats {
+  white-space: nowrap;
+}
+
+.history__claims {
+  align-items: center;
+  color: var(--muted);
+  display: flex;
+  white-space: nowrap;
+}
+
+/*
+ * Whose claim is whose, without having to work out which side of the slash is which. The colours
+ * are shared with the entry form's labels, so the same seat reads the same everywhere — and they
+ * are deliberately neither the Fascist red nor the Liberal blue, which already mean a card colour.
+ */
+/*
+ * A claimed hand or a figure quoted from one. Deliberately NOT `.claim`, which is the readout's
+ * block wrapper — reusing it made every claim block in the readout bold.
+ */
+.claim__value {
+  font-weight: 700;
+}
+
+/*
+ * One colour per seat, used everywhere either of them is named — the entry labels, the readout
+ * headings, the accusations, the history, the dossier. Telling the two apart is the whole job, so
+ * the pair is deliberately neither the Fascist red nor the Liberal blue, which already mean a card.
+ */
+.is-president {
+  color: var(--president);
+}
+
+.is-chancellor {
+  color: var(--chancellor);
+}
+
+/* The policy colours as text, and on the two buttons that name a policy rather than showing one. */
+.is-fascist:not(button),
+button.is-fascist {
+  color: var(--fascist);
+}
+
+.is-liberal:not(button),
+button.is-liberal {
+  color: var(--liberal);
+}
+
+/*
+ * A pressed button is filled with the colour it stands for, so the letters inside it go back to the
+ * button's own text colour — red on near-black would be the one place these colours are hard to
+ * read.
+ */
+button[aria-pressed='true']:not(.history__summary) .is-fascist,
+button[aria-pressed='true']:not(.history__summary) .is-liberal,
+button[aria-pressed='true']:not(.history__summary) .is-president,
+button[aria-pressed='true']:not(.history__summary) .is-chancellor {
+  color: inherit;
+}
+
+/*
+ * Which seat an account belongs to, now that the letters are coloured by policy rather than by
+ * speaker. Small and set apart, because it labels the reading rather than being part of it.
+ */
+.claim__tag {
+  font-size: 0.8em;
+  font-weight: 700;
+  margin-left: 0.45em;
+  margin-right: 0.2em;
+}
+
+.claim__tag:first-child {
+  margin-left: 0;
+}
+
+.claim__aside {
+  color: var(--muted);
+  margin: 0 0.15em;
+}
+
+/* Named as well as coloured, so the difference survives a colour-blind reader and a dim projector. */
+.mark {
+  border-radius: 0.25em;
+  font-size: 0.75em;
+  letter-spacing: 0.06em;
+  margin-left: 0.4em;
+  padding: 0.05em 0.4em;
+  text-transform: uppercase;
+}
+
+.mark--conflict {
+  background: var(--impossible);
+  color: #fff;
+}
+
+.mark--weird {
+  background: var(--weird);
+  color: var(--surface);
+}
+
+.history__votes {
+  font-size: 0.9em;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+}
+
+.history__power {
+  color: var(--accent);
+  font-size: 0.85em;
+  white-space: nowrap;
+}
+
+/* Powers and the Hitler check sit apart from the plain per-round fields. */
+.field--power {
+  border-left: 3px solid var(--accent);
+  padding-left: 0.5em;
+}
+
+.pin {
+  font-size: 0.7em;
+  min-height: 1.6em;
+  min-width: 1.8em;
+  padding: 0.05em 0.35em;
+}
+
+.history__group {
+  align-items: stretch;
+  display: flex;
+  gap: 0.5em;
+}
+
+.history__assume {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2em;
+  margin-top: 0.2em;
+}
+
+.history__assume-label {
+  color: var(--muted);
+  font-size: 0.7em;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Rounds before a reshuffle cannot move anything, so they read as inert rather than interactive. */
+.history__round--settled {
+  opacity: 0.55;
+}
+
+.history__divider {
+  align-items: center;
+  border-left: 2px dashed var(--border);
+  color: var(--muted);
+  display: flex;
+  font-size: 0.7em;
+  letter-spacing: 0.08em;
+  padding-left: 0.5em;
+  text-transform: uppercase;
+  writing-mode: vertical-rl;
+}
