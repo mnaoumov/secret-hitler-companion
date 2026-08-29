@@ -903,11 +903,36 @@ button.is-liberal {
  * button's own text colour — red on near-black would be the one place these colours are hard to
  * read.
  */
-button[aria-pressed='true']:not(.history__summary) .is-fascist,
-button[aria-pressed='true']:not(.history__summary) .is-liberal,
-button[aria-pressed='true']:not(.history__summary) .is-president,
-button[aria-pressed='true']:not(.history__summary) .is-chancellor {
+button[aria-pressed='true']:not(.history__summary, .hand) .is-fascist,
+button[aria-pressed='true']:not(.history__summary, .hand) .is-liberal,
+button[aria-pressed='true']:not(.history__summary, .hand) .is-president,
+button[aria-pressed='true']:not(.history__summary, .hand) .is-chancellor {
   color: inherit;
+}
+
+/*
+ * A button whose label IS a hand keeps its letters coloured when selected, so it is marked by a
+ * heavy inset ring rather than by being filled. Filling it would either hide the colours behind a
+ * dark background or leave dark red on near-black, and the letters are the content here — the
+ * selection is only a state on top of them.
+ */
+button.hand[aria-pressed='true'] {
+  background: var(--surface);
+  border-color: var(--text);
+  box-shadow: inset 0 0 0 0.14em var(--text);
+  color: var(--text);
+}
+
+/*
+ * What the President actually claimed, as opposed to what is currently assumed about him. Underlined
+ * rather than boxed: it has to stay legible on top of the selection ring, and it must not change the
+ * button's size.
+ */
+button.is-claimed {
+  text-decoration: underline;
+  text-decoration-color: var(--president);
+  text-decoration-thickness: 0.14em;
+  text-underline-offset: 0.18em;
 }
 
 /*

@@ -331,8 +331,11 @@ function describeBounds(assessment: ClaimAssessment | undefined, view?: ReadoutV
    * decision, and the shuffle has nothing to say about it. The low end is how often the pair is
    * forced, the high end how often it is merely possible. Collapsing that to one figure would mean
    * inventing a model of how people discard.
+   *
+   * The range used to be followed by a sentence explaining that the gap is his choice. Two numbers
+   * with a gap between them already say that, and it was read every round for no new information.
    */
-  return `between ${formatPercentage(assessment.bounds.min)} and ${formatPercentage(assessment.bounds.max)} — the rest is his choice, which the shuffle cannot speak to`;
+  return `between ${formatPercentage(assessment.bounds.min)} and ${formatPercentage(assessment.bounds.max)}`;
 }
 
 /*
@@ -864,7 +867,13 @@ function renderAssumption(index: number, round: Round): HTMLElement {
 
   const toggles = selectable.map((fascistCount) =>
     element('button', {
-      className: 'pin',
+      /*
+       * The toggles start with every consistent hand switched on, so "selected" says nothing about
+       * what he said — and with three of them lit there was no way to tell his claim from the
+       * default. The claimed one is underlined in his own colour, which survives the pressed state
+       * and costs no layout.
+       */
+      className: fascistCount === round.presidentClaim ? 'pin hand is-claimed' : 'pin hand',
       onClick: () => {
         state.rounds[index] = {
           ...round,
@@ -872,7 +881,8 @@ function renderAssumption(index: number, round: Round): HTMLElement {
         };
         render();
       },
-      pressed: isAssumed(round.assumedDrawFascistCounts, fascistCount)
+      pressed: isAssumed(round.assumedDrawFascistCounts, fascistCount),
+      title: fascistCount === round.presidentClaim ? 'what the President claimed' : ''
     }, renderHand(fascistCount, DRAW_SIZE))
   );
 
@@ -914,7 +924,13 @@ function renderBoard(analysis: GameAnalysis): HTMLElement {
   const tracker = analysis.rounds.at(-1)?.electionTracker ?? 0;
 
   return element('header', { className: 'board' }, [
-    element('div', { className: 'board__title', text: 'Secret Hitler Companion' }),
+    /*
+     * The short form here, the full name on the setup screen and in the browser tab. The header also
+     * carries three tracks and two buttons, and at a readable type size the full name is the thing
+     * that has to give — it was truncating mid-word, which is worse than simply
+     * saying less.
+     */
+    element('div', { className: 'board__title', text: 'Secret Hitler' }),
     renderTrack('Liberal', analysis.enactedLiberalCount, LIBERAL_TRACK_LENGTH, 'pip--liberal'),
     renderTrack('Fascist', analysis.enactedFascistCount, FASCIST_TRACK_LENGTH, 'pip--fascist'),
     renderTrack('Tracker', tracker, ELECTION_TRACKER_LIMIT, 'pip--tracker'),
@@ -928,6 +944,7 @@ function renderChancellorClaimField(): HTMLElement {
 
   const buttons = descendingCounts(PASS_SIZE).map((fascistCount) =>
     element('button', {
+      className: 'hand',
       disabled: isLocked,
       onClick: () => {
         state.draft.chancellorClaim = state.draft.chancellorClaim === fascistCount ? undefined : fascistCount;
@@ -1288,8 +1305,12 @@ function renderDrawOdds(deck: DeckState): HTMLElement {
  *
  * The one above is the draw before anyone knows anything. This one is the same question asked again
  * after the enacted policy is face up — a public fact, which rules a hand out entirely (no Fascist
- * comes from LLL) and re-weights the rest. Saying "given the Fascist" was conditional-probability
- * notation written out in English, and it read as jargon to the table.
+ * comes from LLL) and re-weights the rest.
+ *
+ * The heading does not spell that conditioning out. It said "given the Fascist" first, which was
+ * conditional-probability notation written in English, then "now that a Fascist is on the table",
+ * which was merely long: the enacted policy is a button two rows up and nobody needs reminding it
+ * is there.
  */
 function renderDrawTable(view: ReadoutView): HTMLElement {
   const rows = descendingCounts(DRAW_SIZE).map((fascistCount) =>
@@ -1299,15 +1320,11 @@ function renderDrawTable(view: ReadoutView): HTMLElement {
     ])
   );
 
-  const colour = view.enacted === Policy.Fascist ? 'Fascist' : 'Liberal';
-
   return element('div', { className: 'claim' }, [
     element('div', { className: 'claim__title' }, [
       element('span', { className: 'is-president', text: 'President claims ' }),
       ...renderHand(view.presidentClaim ?? 0, DRAW_SIZE),
-      element('span', { className: 'is-president', text: ' — what he really held, now that a ' }),
-      element('span', { className: view.enacted === Policy.Fascist ? 'is-fascist' : 'is-liberal', text: colour }),
-      element('span', { className: 'is-president', text: ' is on the table:' })
+      element('span', { className: 'is-president', text: ' — what he really held:' })
     ]),
     element('table', {}, [
       element('thead', {}, [
@@ -2095,6 +2112,7 @@ function renderPresidentClaimField(): HTMLElement {
 
   const buttons = descendingCounts(DRAW_SIZE).map((fascistCount) =>
     element('button', {
+      className: 'hand',
       disabled: isLocked,
       onClick: () => {
         state.draft.presidentClaim = state.draft.presidentClaim === fascistCount ? undefined : fascistCount;

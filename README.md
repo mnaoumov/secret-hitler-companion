@@ -51,7 +51,7 @@ disk.
 ## Deployment
 
 Pushing to `main` publishes to GitHub Pages at
-<https://mnaoumov.github.io/secret-hitler-companion/>, but only after the full check job passes — a
+<https://mnaoumov.dev/secret-hitler-companion/>, but only after the full check job passes — a
 site the table is reading mid-game should never be updated by a broken build.
 
 The workflow is the `deploy` job in [`.github/workflows/ci.yml`](.github/workflows/ci.yml). It needs
