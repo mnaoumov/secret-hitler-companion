@@ -12,9 +12,10 @@ import {
  *
  * - Repeating `--skip` does not accumulate in this version of linkinator. A second occurrence makes
  *   it skip *every* link and report "scanned 0 links" — a silent pass that checks nothing.
- * - `cmdEscapeCommandLine` in `exec.ts` prefixes every cmd metacharacter with `^` across the whole
- *   command line, quoted arguments included, so a pattern holding `(`, `)` or `|` arrives mangled.
- *   `^https?://(127\.0\.0\.1|localhost)` made cmd try to run `localhost)` as a program.
+ * - On Windows, `npx` resolves to a `.cmd` shim, and a shim re-parses the arguments cmd already
+ *   handed it. A pattern holding `|` is split there as a pipe no matter how carefully it was
+ *   escaped on the way in: `^https?://(127\.0\.0\.1|localhost)` made cmd try to run `localhost)`
+ *   as a program. `exec.ts` is not at fault — the same argument reaches a real `.exe` intact.
  */
 const LINKINATOR_CONFIG_FILE = 'linkinator.config.json';
 
