@@ -886,7 +886,21 @@ function renderAssumption(index: number, round: Round): HTMLElement {
     }, renderHand(fascistCount, DRAW_SIZE))
   );
 
+  /*
+   * Say outright which one he claimed, rather than leaving it to the marker alone. The toggles start
+   * with every consistent hand switched on, so "three of them lit" is the resting state and carries
+   * no information about what was said — and when he said nothing at all, an unmarked strip looks
+   * exactly the same as one whose marker was missed.
+   */
+  const claim = round.presidentClaim === undefined
+    ? [element('span', { className: 'history__assume-label', text: 'he said nothing' })]
+    : [
+      element('span', { className: 'history__assume-label', text: 'he said' }),
+      element('span', { className: 'claim__value' }, renderHand(round.presidentClaim, DRAW_SIZE))
+    ];
+
   return element('div', { className: 'history__assume' }, [
+    ...claim,
     element('span', { className: 'history__assume-label', text: 'assume' }),
     ...toggles
   ]);
@@ -955,7 +969,7 @@ function renderChancellorClaimField(): HTMLElement {
     }, renderHand(fascistCount, PASS_SIZE))
   );
 
-  return element('div', { className: 'field field--optional field--stacked' }, [
+  return element('div', { className: 'field field--optional' }, [
     element('span', { className: 'field__label is-chancellor', text: 'Chancellor claims received' }),
     ...buttons,
     ...renderChancellorDiscard()
@@ -1264,7 +1278,7 @@ function renderDrawOdds(deck: DeckState): HTMLElement {
   );
 
   return element('div', { className: 'claim' }, [
-    element('div', { className: 'claim__title', text: 'The draw — what the President will get' }),
+    element('div', { className: 'claim__title' }, renderPhrase('The draw — what the President gets')),
     element('table', {}, [
       element('thead', {}, [
         element('tr', {}, [
@@ -1276,14 +1290,12 @@ function renderDrawOdds(deck: DeckState): HTMLElement {
     ]),
     element('div', { className: 'legend' }, [
       element('div', {}, [
-        element('strong', { text: 'At least one Liberal: ' }),
+        element('strong', {}, renderPhrase('At least one Liberal: ')),
         element('span', { text: formatPercentage(atLeastOneLiberal) })
       ]),
       element('div', {}, [
-        element('strong', { text: 'Top card: ' }),
-        element('span', {
-          text: `Fascist ${formatPercentage(fascistOnTop)} · Liberal ${formatPercentage(1 - fascistOnTop)}`
-        })
+        element('strong', { text: 'Top law in the deck: ' }),
+        element('span', {}, renderPhrase(`Fascist ${formatPercentage(fascistOnTop)} · Liberal ${formatPercentage(1 - fascistOnTop)}`))
       ])
     ])
   ]);
@@ -2012,7 +2024,7 @@ function renderPolicyField(analysis: GameAnalysis): HTMLElement {
   }
 
   return element('div', { className: 'field' }, [
-    element('span', { className: 'field__label', text: 'Enacted' }),
+    element('span', { className: 'field__label', text: 'Law enacted' }),
     ...buttons
   ]);
 }
@@ -2129,7 +2141,7 @@ function renderPresidentClaimField(): HTMLElement {
     }, renderHand(fascistCount, DRAW_SIZE))
   );
 
-  return element('div', { className: 'field field--optional field--stacked' }, [
+  return element('div', { className: 'field field--optional' }, [
     element('span', { className: 'field__label is-president', text: 'President claims received' }),
     ...buttons
   ]);
@@ -2165,7 +2177,7 @@ function renderPresidentDiscardField(): HTMLElement {
 
   const passed = getClaimedPassFascistCount(claim, state.draft.presidentDiscard);
 
-  return element('div', { className: 'field field--optional field--stacked' }, [
+  return element('div', { className: 'field field--optional' }, [
     element('span', { className: 'field__label is-president', text: 'President claims discarded' }),
     ...buttons,
     ...(passed === undefined

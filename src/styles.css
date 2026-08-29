@@ -474,22 +474,18 @@ body {
  * A fixed column, so every row's buttons start at the same x — at a table the eye finds the row by
  * its label and the thumb finds the button by its position, and a ragged left edge breaks the
  * second.
+ *
+ * Wide enough for "Chancellor claims received" on one line. That did not fit while the form was one
+ * of two columns, which is why those labels briefly sat on a line of their own; the form has the
+ * full width now, so the buttons belong beside their label rather than under it.
  */
 .field__label {
   color: var(--muted);
-  flex: 0 0 7em;
+  flex: 0 0 13.5em;
   font-size: 0.85em;
 }
 
-/*
- * The three claim rows say a whole sentence, which will not fit that column at any width worth
- * paying for: widening it to hold "Chancellor claims received" pushed the seven-seat vote row onto
- * two lines and moved every button people had learned to aim at. So those labels take a line of
- * their own and hand the full width back to the buttons.
- */
-.field--stacked .field__label {
-  flex: 1 0 100%;
-}
+
 
 /* Optional fields are marked by a lighter label, not by a glyph that can wrap away from it. */
 .field--optional .field__label {
@@ -929,6 +925,7 @@ button.hand[aria-pressed='true'] {
  * button's size.
  */
 button.is-claimed {
+  border-color: var(--president);
   text-decoration: underline;
   text-decoration-color: var(--president);
   text-decoration-thickness: 0.14em;
