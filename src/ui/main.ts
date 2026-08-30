@@ -2194,35 +2194,44 @@ function renderOdds(): HTMLElement[] {
   const twoFascists = (distribution[DRAW_SIZE] ?? 0) + (distribution[DRAW_SIZE - 1] ?? 0);
   const allFascist = distribution[DRAW_SIZE] ?? 0;
 
-  const governments = [
-    { chancellor: 'Fascist', president: 'Fascist', value: anyFascist },
-    { chancellor: 'Liberal', president: 'Fascist', value: twoFascists },
-    { chancellor: 'Fascist', president: 'Liberal', value: twoFascists },
-    { chancellor: 'Liberal', president: 'Liberal', value: allFascist }
-  ];
+  const rows = [
+    { chancellor: 'Fascist', fascistLaw: anyFascist, president: 'Fascist' },
+    { chancellor: 'Liberal', fascistLaw: twoFascists, president: 'Fascist' },
+    { chancellor: 'Fascist', fascistLaw: twoFascists, president: 'Liberal' },
+    { chancellor: 'Liberal', fascistLaw: allFascist, president: 'Liberal' }
+  ].map((government) => renderOddsRow(`${government.president} President with a ${government.chancellor} Chancellor`, government.fascistLaw));
 
-  const rows = governments.map((government) =>
-    element('div', { className: 'field' }, [
-      element('span', {}, renderPhrase(`${government.president} President with a ${government.chancellor} Chancellor`)),
-      element('span', { className: 'claim__value', text: formatPercentage(government.value) })
-    ])
-  );
-
+  /*
+   * The two columns are complements — a government enacts exactly one law — but reading "6.1%" off
+   * a Fascist column is not the same act as reading "93.9%" off a Liberal one, and a table deciding
+   * whether to seat somebody is doing one or the other, not the arithmetic between them.
+   */
   return [
     element('div', { className: 'claim' }, [
-      element('div', { className: 'claim__title' }, renderPhrase('Chance of a Fascist law, by who is in the government')),
-      ...rows
-    ]),
-    element('div', { className: 'claim' }, [
-      element('div', { className: 'field' }, [
-        element('span', {}, renderPhrase('Letting the vote fail turns up a Liberal law')),
-        element('span', {
-          className: 'claim__value',
-          text: formatPercentage(1 - getTopCardFascistProbability(deck))
-        })
+      element('table', {}, [
+        element('thead', {}, [
+          element('tr', {}, [
+            element('th', {}),
+            element('th', {}, renderPhrase('Fascist law')),
+            element('th', {}, renderPhrase('Liberal law'))
+          ])
+        ]),
+        element('tbody', {}, [
+          ...rows,
+          renderOddsRow('Taking the top law after 3 failed government votes', getTopCardFascistProbability(deck))
+        ])
       ])
     ])
   ];
+}
+
+/** One line of the odds table: what it is, then the chance of each law coming out of it. */
+function renderOddsRow(label: string, fascistLaw: number): HTMLElement {
+  return element('tr', {}, [
+    element('td', { className: 'odds__label' }, renderPhrase(label)),
+    element('td', { text: formatPercentage(fascistLaw) }),
+    element('td', { text: formatPercentage(1 - fascistLaw) })
+  ]);
 }
 
 function renderPassClaim(view: ReadoutView): HTMLElement {

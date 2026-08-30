@@ -677,6 +677,12 @@ td {
   text-align: right;
 }
 
+/* The row's subject reads left to right; only the figures are columns of numbers. */
+.odds__label {
+  text-align: left;
+  width: 60%;
+}
+
 tr.is-claimed td {
   font-weight: 700;
 }
