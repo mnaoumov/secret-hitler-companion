@@ -314,15 +314,6 @@ function createPlayers(count: number): Player[] {
  * Ordered, because the peek returns the cards to the top untouched — so if he shares it, the next
  * President's draw is exactly these three and the two stories can be checked against each other.
  */
-/** Unset, then Fascist, then Liberal, then back — one target rather than three to aim at. */
-function cyclePolicy(value: Policy | undefined): Policy | undefined {
-  if (value === undefined) {
-    return Policy.Fascist;
-  }
-
-  return value === Policy.Fascist ? Policy.Liberal : undefined;
-}
-
 /** Ja, then nein, then back to unrecorded — one target cycling rather than three to aim at. */
 function cycleVote(playerId: string): void {
   // Changing a vote reopens the tally; the previous confirmation no longer describes it.
@@ -745,6 +736,20 @@ function getLivingPlayers(): Player[] {
   const deadIds = getDeadPlayerIds();
 
   return state.players.filter((player) => !deadIds.has(player.id));
+}
+
+/** Every sequence of three cards he could report, in a stable order. */
+function getPeekSequences(): Policy[][] {
+  let sequences: Policy[][] = [[]];
+
+  for (let position = 0; position < DRAW_SIZE; position++) {
+    sequences = sequences.flatMap((sequence) => [
+      [...sequence, Policy.Fascist],
+      [...sequence, Policy.Liberal]
+    ]);
+  }
+
+  return sequences;
 }
 
 function getPolicyClassName(value: Policy | undefined): string {
@@ -2156,36 +2161,35 @@ function renderPassClaim(view: ReadoutView): HTMLElement {
 
 function renderPeek(isLocked: boolean): HTMLElement[] {
   /*
-   * An empty slot shows the same dot a seat that has not voted does, not a question mark.
+   * Every sequence he could report, as eight buttons, rather than three cards cycled one at a time.
    *
-   * A `?` read as an answer — "he would not say what this card was" — which is the job of the
-   * refusal button beside it, and the row then offered two ways to say the same thing. The dot is
-   * the mark this app already uses for nothing-recorded-here, so it says only that.
+   * This makes the peek the same shape as every other question the table puts: one tap is one
+   * answer, and there is no half-filled state to be stuck in or to mistake for a reply. It was also
+   * the only cycling control in the app, with its own vocabulary for "nothing here yet" that read
+   * as a refusal.
    *
-   * The slots go dead once he has refused: the question is answered, and three live buttons under
-   * an answered question invite a tap that would contradict it.
+   * The order is the answer. He looks at the top three in sequence and reports them in sequence, so
+   * FFL and FLF are different claims and are scored differently.
    */
-  const isRefused = state.draft.refusals.has('peek');
-
-  const slots = Array.from({ length: DRAW_SIZE }, (_unused, slot) => {
-    const value = state.draft.peek[slot];
+  const buttons = getPeekSequences().map((sequence) => {
+    const isChosen = state.draft.peek.length === DRAW_SIZE
+      && sequence.every((policy, position) => state.draft.peek[position] === policy);
 
     return element('button', {
-      className: getPolicyClassName(value),
-      disabled: isLocked || isRefused,
+      className: 'hand',
+      disabled: isLocked,
       onClick: () => {
-        state.draft.peek[slot] = cyclePolicy(value);
+        state.draft.peek = isChosen ? [] : [...sequence];
         state.draft.refusals.delete('peek');
         render();
       },
-      pressed: value !== undefined,
-      text: value ?? '·'
-    });
+      pressed: isChosen
+    }, renderPolicySequence(sequence));
   });
 
   return [element('div', { className: 'field field--power' }, [
     element('span', { className: 'field__label', text: 'Peek says' }),
-    ...slots,
+    ...buttons,
     renderRefusal(
       'peek',
       () => {
@@ -2355,6 +2359,17 @@ function renderPolicyField(analysis: GameAnalysis): HTMLElement {
     element('span', { className: 'field__label', text: 'Law enacted' }),
     ...buttons
   ]);
+}
+
+/**
+ * Cards in the order given, each in its own colour.
+ *
+ * Not `renderHand`, which takes a count and rebuilds the hand with the Fascists first — right for a
+ * hand, where only the count is claimed, and wrong for a peek, where the order IS the claim. Using
+ * it here turned FLF into FFL on screen.
+ */
+function renderPolicySequence(policies: readonly Policy[]): HTMLElement[] {
+  return policies.map((policy) => element('span', { className: getPolicyClassName(policy), text: policy }));
 }
 
 /*
