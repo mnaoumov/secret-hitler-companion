@@ -89,22 +89,29 @@ Two different findings, and conflating them would be a real error:
 
 Neither is scored. A conflict is a proof; a weird play is an observation.
 
-### What is deliberately not shown
+### The odds, and why they are behind a tap
 
-**No forecast of the draw before the claims.** The engine computes it — `getDrawDistribution` and
-`getTopCardFascistProbability` are exported and tested — but nothing renders it during a game, and
-that is a design decision rather than an oversight.
+The deck odds are shown **only before the vote, and only after the table taps to reveal them**. Do
+not make them permanent, and do not surface them once a government has formed.
 
-Nobody honest takes a decision from it. By the time the government has formed, the President is
-looking at his real cards, the Chancellor at his, and the vote is over. The one player it helps is a
-Fascist choosing what to claim: he reads off that a hand is unlikely and avoids the lie that would
-have caught him. Leaving him to guess is what makes lying cost something, and the improbable claim
-he then makes is exactly what the Liberals are meant to catch. "It is public information anyway"
-does not rescue it — this whole app exists because that arithmetic is impractical at a live table,
-so putting it on screen hands him a capability he would not otherwise have.
+The reasoning, because it is not obvious and was got wrong twice:
 
-The pile's composition (`11F 6L`) stays, because it is plain bookkeeping the table could do itself
-and every later number is read against it.
+- They inform three real pre-vote decisions: whether a trusted pair will manage a Liberal law,
+  whether a suspected President could force a Fascist one (he needs two Fascists to do it), and
+  whether letting the vote fail is better than governing.
+- They also tell a Fascist whether his intended lie is plausible, so he can avoid the improbable
+  claim that would have exposed him. That is a real cost — the improbable claim is exactly what the
+  Liberals are meant to catch.
+- **No display can deny him the numbers.** Hiding them from the President and Chancellor candidates
+  does not work: another Fascist reads the screen and nods. Anything shown to anyone is available to
+  the Fascist team.
+- What can be denied is *quiet, constant* access. Behind a public tap he must ask the table to turn
+  them over, in front of the people he is lying to, and wanting to look is itself information for
+  everyone else.
+
+Phrase them as decisions, never as a ranking of hands: a ranking is read backwards by a liar
+choosing a story. The pile's composition (`11F 6L`) stays visible throughout, being plain bookkeeping
+the table could do itself and the thing every later number is read against.
 
 ## Architecture
 

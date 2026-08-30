@@ -19,8 +19,10 @@ import {
   getClaimedPassFascistCount
 } from '../engine/claims.ts';
 import {
+  getDrawDistribution,
   getExactFascistCount,
-  getOrderedDrawProbability
+  getOrderedDrawProbability,
+  getTopCardFascistProbability
 } from '../engine/deck.ts';
 import {
   analyseGame,
@@ -85,17 +87,6 @@ interface AppState {
 }
 
 interface Draft {
-  chancellorClaim?: number | undefined;
-  chancellorId?: string | undefined;
-  enacted?: Policy | undefined;
-  executionTargetId?: string | undefined;
-
-  /** Revealed off the top because this was the third rejection in a row. */
-  forcedEnactment?: Policy | undefined;
-  hitlerCheckAnswer?: 'no' | 'yes' | undefined;
-  investigationReported?: Policy | undefined;
-  investigationTargetId?: string | undefined;
-
   /**
    * Set once the table says the vote is finished.
    *
@@ -103,6 +94,25 @@ interface Draft {
    * form resolve early and jump about while people are still voting — and leaves no way to tell a
    * finished unanimous ja from a vote still in progress.
    */
+  /**
+   * Whether the table has agreed to look at the odds before voting.
+   *
+   * Per round, and it resets with the draft, so the agreement is made afresh each time rather than
+   * switched on once and forgotten.
+   */
+  areOddsRevealed?: boolean | undefined;
+  chancellorClaim?: number | undefined;
+  chancellorId?: string | undefined;
+  enacted?: Policy | undefined;
+
+  executionTargetId?: string | undefined;
+  /** Revealed off the top because this was the third rejection in a row. */
+  forcedEnactment?: Policy | undefined;
+  hitlerCheckAnswer?: 'no' | 'yes' | undefined;
+  investigationReported?: Policy | undefined;
+
+  investigationTargetId?: string | undefined;
+
   /**
    * Whether the government vetoed the agenda.
    *
@@ -865,13 +875,15 @@ function render(): void {
   const view = getReadoutView(committedAnalysis);
 
   /*
-   * The odds describe a draw that is about to happen, so they are shown only when one is. Before the
-   * vote is settled there is no government to draw, a rejected government never reaches the deck,
-   * and once the game is decided nobody draws again — in all three the table was reading a forecast
-   * for a legislative session that does not exist. Reviewing a recorded round always shows it.
+   * Shown while the vote is still open — where the odds inform it, behind the table's agreement —
+   * and once a government has formed, where the claims are scored. A rejected government never
+   * reaches the deck and a decided game draws no more cards, so neither shows anything. Reviewing a
+   * recorded round always shows it.
    */
   const isReviewing = state.selectedRoundIndex !== undefined;
-  const showReadout = isReviewing || (!committedAnalysis.victory && getDraftOutcome() === 'elected');
+  const outcome = getDraftOutcome();
+  const showReadout = isReviewing
+    || (!committedAnalysis.victory && (outcome === 'elected' || outcome === 'pending'));
 
   const scrollPositions = captureScrollPositions(appRoot);
 
@@ -1870,6 +1882,61 @@ function renderNewGame(): HTMLElement {
   });
 }
 
+/*
+ * The odds, and the table's decision to look at them.
+ *
+ * Hidden by default and revealed by a tap that everyone sees. That is the whole mechanism: the
+ * numbers help a Fascist judge whether a lie is safe, but he cannot consult them quietly — he has to
+ * ask the table to turn them over, in front of the people he is lying to, and wanting to look is
+ * itself worth something to the others. Revealed, everyone reads the same thing.
+ *
+ * They are phrased as the three decisions they actually inform, rather than as a ranking of hands.
+ * A hand ranking is read backwards by a liar picking a story; a decision is not.
+ */
+function renderOdds(): HTMLElement[] {
+  if (state.draft.areOddsRevealed !== true) {
+    return [
+      element('div', { className: 'field' }, [
+        element('button', {
+          className: 'pin',
+          onClick: () => {
+            state.draft.areOddsRevealed = true;
+            render();
+          },
+          text: 'reveal the odds'
+        }),
+        element('span', { className: 'deck__note', text: 'agree first — the whole table sees this' })
+      ])
+    ];
+  }
+
+  const deck = analyseGame({ players: state.players, rounds: state.rounds }).deckAfter;
+  const distribution = getDrawDistribution(deck);
+  const fascistOnTop = getTopCardFascistProbability(deck);
+
+  const lines = [
+    { label: 'A government you trust enacts a Liberal law', value: 1 - (distribution[DRAW_SIZE] ?? 0) },
+    {
+      label: 'A Fascist President could force a Fascist law',
+      value: (distribution[DRAW_SIZE] ?? 0) + (distribution[DRAW_SIZE - 1] ?? 0)
+    },
+    { label: 'Letting the vote fail turns up a Liberal law', value: 1 - fascistOnTop }
+  ];
+
+  return [
+    element(
+      'div',
+      { className: 'claim' },
+      lines.map((line) =>
+        element('div', { className: 'field' }, [
+          element('span', {}, renderPhrase(line.label)),
+          element('span', { className: 'claim__value', text: formatPercentage(line.value) })
+        ])
+      )
+    )
+  ];
+}
+
 function renderPassClaim(view: ReadoutView): HTMLElement {
   return element('div', { className: 'claim' }, [
     element('div', { className: 'claim__title' }, [
@@ -2243,6 +2310,12 @@ function renderReadout(view: ReadoutView | undefined): HTMLElement {
     ]),
     renderDeck(deck)
   ]);
+
+  if (view !== undefined && !view.isRecorded && getDraftOutcome() === 'pending') {
+    panel.append(...renderOdds());
+
+    return panel;
+  }
 
   if (!view?.enacted) {
     /*
