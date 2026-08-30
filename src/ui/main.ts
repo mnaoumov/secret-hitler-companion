@@ -458,7 +458,7 @@ function describeMissingFields(analysis: GameAnalysis): string | undefined {
   }
 
   if (isDraftElected()) {
-    if (analysis.enactedFascistCount >= HITLER_ZONE_THRESHOLD && state.draft.hitlerCheckAnswer === undefined) {
+    if (isHitlerCheckPending(analysis)) {
       return 'Ask the Chancellor if he is Hitler';
     }
 
@@ -948,6 +948,22 @@ function isHand(part: string): boolean {
   return /^[FL]{2,3}$/.test(part);
 }
 
+/**
+ * Whether this Chancellor has to be asked at all.
+ *
+ * Inside the zone the rules put the question to every new Chancellor, but a man who has already
+ * survived it has been proved not to be Hitler, and that proof does not expire. Asking again is
+ * asking a question whose answer is on the record — and a table that is asked it again reasonably
+ * wonders whether the record was lost.
+ */
+function isHitlerCheckAsked(analysis: GameAnalysis): boolean {
+  const chancellorId = state.draft.chancellorId;
+
+  return analysis.enactedFascistCount >= HITLER_ZONE_THRESHOLD
+    && chancellorId !== undefined
+    && !analysis.confirmedNotHitler.includes(chancellorId);
+}
+
 /*
  * The Hitler check is the one statement the rules force to be truthful, so surviving it is proof
  * rather than testimony. It only means anything inside the zone, so it only appears there.
@@ -960,9 +976,7 @@ function isHand(part: string): boolean {
  * could not be read off the draft alone: the question exists only inside the Hitler zone.
  */
 function isHitlerCheckPending(analysis: GameAnalysis): boolean {
-  return analysis.enactedFascistCount >= HITLER_ZONE_THRESHOLD
-    && state.draft.chancellorId !== undefined
-    && state.draft.hitlerCheckAnswer === undefined;
+  return isHitlerCheckAsked(analysis) && state.draft.hitlerCheckAnswer === undefined;
 }
 
 /**
@@ -1909,8 +1923,21 @@ function renderHistoryVotes(round: Round): HTMLElement[] {
 }
 
 function renderHitlerCheck(analysis: GameAnalysis): HTMLElement[] {
-  if (analysis.enactedFascistCount < HITLER_ZONE_THRESHOLD || state.draft.chancellorId === undefined) {
+  const chancellorId = state.draft.chancellorId;
+
+  if (analysis.enactedFascistCount < HITLER_ZONE_THRESHOLD || chancellorId === undefined) {
     return [];
+  }
+
+  /*
+   * The answer stands in place of the question, rather than the row simply vanishing. In the zone
+   * the table expects to be asked, and a row that is silently absent reads as a bug.
+   */
+  if (analysis.confirmedNotHitler.includes(chancellorId)) {
+    return [element('div', { className: 'field field--power' }, [
+      element('span', { className: 'field__label', text: 'Is Hitler?' }),
+      element('span', { className: 'dossier__proof' }, renderPhrase(`no — ${nameOf(chancellorId)} was asked in an earlier round`))
+    ])];
   }
 
   const answers = [
