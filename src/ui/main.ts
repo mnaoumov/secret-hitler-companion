@@ -158,6 +158,9 @@ interface ReadoutView {
   readonly enacted: Policy | undefined;
   readonly isRecorded: boolean;
 
+  /** True when the government vetoed, which resolves the session without a law. */
+  readonly isVetoed: boolean;
+
   /** What the President said the top three were, once he has said all three. */
   readonly peek: readonly Policy[] | undefined;
 
@@ -673,6 +676,7 @@ function getReadoutView(committedAnalysis: GameAnalysis): ReadoutView | undefine
       deckBefore: analysis.deckBefore,
       enacted: round.enacted,
       isRecorded: true,
+      isVetoed: round.isVetoed === true,
       peek: round.peek,
       presidentClaim: round.presidentClaim,
       presidentId: round.presidentId,
@@ -696,6 +700,7 @@ function getReadoutView(committedAnalysis: GameAnalysis): ReadoutView | undefine
     deckBefore: committedAnalysis.deckAfter,
     enacted: state.draft.enacted,
     isRecorded: false,
+    isVetoed: state.draft.isVetoed === true,
     peek: draftRound.peek,
     presidentClaim: state.draft.presidentClaim,
     presidentId: state.draft.presidentId,
@@ -792,6 +797,22 @@ function isDiscardPossible(claim: number | undefined, discard: Policy | undefine
 
 function isDraftElected(): boolean {
   return getDraftOutcome() === 'elected';
+}
+
+/*
+ * Whether the draw is still ahead of the table.
+ *
+ * The forecast answers "what is the President about to get", which stops being a question the moment
+ * he has got it. Leaving it up afterwards costs a block of the screen to say something the round has
+ * already settled — and worse, it sits there while the claims are being made, which is the one
+ * moment it is more use to a liar than to anyone else: a Fascist picking a story can read off which
+ * hand is most plausible, while an honest President has nothing to choose. The audience loses
+ * nothing by its going, because the table that scores his claim replaces it as soon as he speaks.
+ *
+ * A recorded round never shows it. That draw happened; there is nothing to forecast.
+ */
+function isForecastUseful(view: ReadoutView | undefined): boolean {
+  return view !== undefined && !view.isRecorded && view.enacted === undefined && !view.isVetoed;
 }
 
 function isHand(part: string): boolean {
@@ -1750,6 +1771,8 @@ function renderHistoryVotes(round: Round): HTMLElement[] {
   })];
 }
 
+// ---------- history ----------
+
 /*
  * The Hitler check is the one statement the rules force to be truthful, so surviving it is proof
  * rather than testimony. It only means anything inside the zone, so it only appears there.
@@ -1779,8 +1802,6 @@ function renderHitlerCheck(analysis: GameAnalysis): HTMLElement[] {
     )
   ])];
 }
-
-// ---------- history ----------
 
 /*
  * Why a seat is struck through, spelled out rather than hidden in a tooltip.
@@ -2280,7 +2301,7 @@ function renderReadout(view: ReadoutView | undefined): HTMLElement {
       ...backButton
     ]),
     renderDeck(deck),
-    renderDrawOdds(deck)
+    ...(isForecastUseful(view) ? [renderDrawOdds(deck)] : [])
   ]);
 
   if (!view?.enacted) {
