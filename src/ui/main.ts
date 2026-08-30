@@ -19,10 +19,8 @@ import {
   getClaimedPassFascistCount
 } from '../engine/claims.ts';
 import {
-  getDrawDistribution,
   getExactFascistCount,
-  getOrderedDrawProbability,
-  getTopCardFascistProbability
+  getOrderedDrawProbability
 } from '../engine/deck.ts';
 import {
   analyseGame,
@@ -157,9 +155,6 @@ interface ReadoutView {
   readonly deckBefore: DeckState;
   readonly enacted: Policy | undefined;
   readonly isRecorded: boolean;
-
-  /** True when the government vetoed, which resolves the session without a law. */
-  readonly isVetoed: boolean;
 
   /** What the President said the top three were, once he has said all three. */
   readonly peek: readonly Policy[] | undefined;
@@ -676,7 +671,6 @@ function getReadoutView(committedAnalysis: GameAnalysis): ReadoutView | undefine
       deckBefore: analysis.deckBefore,
       enacted: round.enacted,
       isRecorded: true,
-      isVetoed: round.isVetoed === true,
       peek: round.peek,
       presidentClaim: round.presidentClaim,
       presidentId: round.presidentId,
@@ -700,7 +694,6 @@ function getReadoutView(committedAnalysis: GameAnalysis): ReadoutView | undefine
     deckBefore: committedAnalysis.deckAfter,
     enacted: state.draft.enacted,
     isRecorded: false,
-    isVetoed: state.draft.isVetoed === true,
     peek: draftRound.peek,
     presidentClaim: state.draft.presidentClaim,
     presidentId: state.draft.presidentId,
@@ -797,22 +790,6 @@ function isDiscardPossible(claim: number | undefined, discard: Policy | undefine
 
 function isDraftElected(): boolean {
   return getDraftOutcome() === 'elected';
-}
-
-/*
- * Whether the draw is still ahead of the table.
- *
- * The forecast answers "what is the President about to get", which stops being a question the moment
- * he has got it. Leaving it up afterwards costs a block of the screen to say something the round has
- * already settled — and worse, it sits there while the claims are being made, which is the one
- * moment it is more use to a liar than to anyone else: a Fascist picking a story can read off which
- * hand is most plausible, while an honest President has nothing to choose. The audience loses
- * nothing by its going, because the table that scores his claim replaces it as soon as he speaks.
- *
- * A recorded round never shows it. That draw happened; there is nothing to forecast.
- */
-function isForecastUseful(view: ReadoutView | undefined): boolean {
-  return view !== undefined && !view.isRecorded && view.enacted === undefined && !view.isVetoed;
 }
 
 function isHand(part: string): boolean {
@@ -1323,42 +1300,6 @@ function renderDossierHeader(playerId: string, index: number): HTMLElement {
  * are the one thing worth knowing *before* voting on a government, so they are always on screen,
  * even before a round has been entered.
  */
-function renderDrawOdds(deck: DeckState): HTMLElement {
-  const distribution = getDrawDistribution(deck);
-  const fascistOnTop = getTopCardFascistProbability(deck);
-  const atLeastOneLiberal = 1 - (distribution[DRAW_SIZE] ?? 0);
-
-  const rows = descendingCounts(DRAW_SIZE).map((fascistCount) =>
-    element('tr', {}, [
-      element('td', {}, renderHand(fascistCount, DRAW_SIZE)),
-      element('td', { text: formatPercentage(distribution[fascistCount] ?? 0) })
-    ])
-  );
-
-  return element('div', { className: 'claim' }, [
-    element('div', { className: 'claim__title' }, renderPhrase('The draw — what the President gets')),
-    element('table', {}, [
-      element('thead', {}, [
-        element('tr', {}, [
-          element('th', { text: 'Hand' }),
-          element('th', { text: 'Chance' })
-        ])
-      ]),
-      element('tbody', {}, rows)
-    ]),
-    element('div', { className: 'legend' }, [
-      element('div', {}, [
-        element('strong', {}, renderPhrase('At least one Liberal law: ')),
-        element('span', { text: formatPercentage(atLeastOneLiberal) })
-      ]),
-      element('div', {}, [
-        element('strong', { text: 'Top law in the deck: ' }),
-        element('span', {}, renderPhrase(`Fascist ${formatPercentage(fascistOnTop)} · Liberal ${formatPercentage(1 - fascistOnTop)}`))
-      ])
-    ])
-  ]);
-}
-
 /*
  * Two columns, equal weight, both honest readings of the same worlds. `shuffle` quantifies only the
  * shuffle and leaves the President's choice of which card to discard unmodelled; `uniform` treats every
@@ -2300,14 +2241,26 @@ function renderReadout(view: ReadoutView | undefined): HTMLElement {
       element('h2', { className: 'panel__heading', text: heading }),
       ...backButton
     ]),
-    renderDeck(deck),
-    ...(isForecastUseful(view) ? [renderDrawOdds(deck)] : [])
+    renderDeck(deck)
   ]);
 
   if (!view?.enacted) {
+    /*
+     * No forecast of the draw is shown, deliberately.
+     *
+     * It would rank the hands before anyone has spoken, and nobody honest takes a decision from
+     * that: the President is looking at his actual cards, the Chancellor at his, and the vote is
+     * already over. The one player it helps is a Fascist choosing what to claim, who reads off that
+     * a hand is unlikely and quietly avoids the lie that would have caught him. Leaving him to guess
+     * is the risk that makes lying cost something, and the improbable claim he then makes is exactly
+     * what the Liberals are meant to catch.
+     *
+     * The pile's composition above stays: it is plain bookkeeping the table could do itself, and
+     * every later number is read against it.
+     */
     panel.append(element('p', {
       className: 'empty',
-      text: 'Tap the enacted law to narrow this down to what he actually held.'
+      text: 'Record what the government did, and this will say what the shuffle makes of it.'
     }));
 
     return panel;

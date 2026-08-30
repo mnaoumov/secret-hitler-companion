@@ -89,6 +89,23 @@ Two different findings, and conflating them would be a real error:
 
 Neither is scored. A conflict is a proof; a weird play is an observation.
 
+### What is deliberately not shown
+
+**No forecast of the draw before the claims.** The engine computes it — `getDrawDistribution` and
+`getTopCardFascistProbability` are exported and tested — but nothing renders it during a game, and
+that is a design decision rather than an oversight.
+
+Nobody honest takes a decision from it. By the time the government has formed, the President is
+looking at his real cards, the Chancellor at his, and the vote is over. The one player it helps is a
+Fascist choosing what to claim: he reads off that a hand is unlikely and avoids the lie that would
+have caught him. Leaving him to guess is what makes lying cost something, and the improbable claim
+he then makes is exactly what the Liberals are meant to catch. "It is public information anyway"
+does not rescue it — this whole app exists because that arithmetic is impractical at a live table,
+so putting it on screen hands him a capability he would not otherwise have.
+
+The pile's composition (`11F 6L`) stays, because it is plain bookkeeping the table could do itself
+and every later number is read against it.
+
 ## Architecture
 
 - **`src/engine/`** — pure TypeScript, no DOM, fully unit-tested.
