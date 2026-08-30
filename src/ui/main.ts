@@ -59,6 +59,20 @@ interface AppState {
   inspectedPlayerId: string | undefined;
 
   /**
+   * Whether the table has asked the app to remember and calculate.
+   *
+   * Off until somebody turns it on, and it stays wherever it is left, so a group can play blind and
+   * open it later — mid-game, when deciding whether to seat a government they suspect, which is the
+   * moment the tool is worth most. Nothing here blocks recording: the round is entered either way,
+   * and turning it on is a decision about what the players want to be told, not about the data.
+   *
+   * The line it draws: what is physically on the table stays visible — the two tracks, the election
+   * tracker, who is dead, who survived the Hitler check — because a player sitting there can see all
+   * of it. What the app remembers for you and what it works out are behind the switch.
+   */
+  isAnalysisVisible: boolean;
+
+  /**
    * Whether the history is open over the page.
    *
    * It was a permanent strip along the bottom, which cost a band of a screen that has none to spare
@@ -87,20 +101,6 @@ interface AppState {
 }
 
 interface Draft {
-  /**
-   * Set once the table says the vote is finished.
-   *
-   * Without it the outcome has to be guessed from how many votes happen to be in, which makes the
-   * form resolve early and jump about while people are still voting — and leaves no way to tell a
-   * finished unanimous ja from a vote still in progress.
-   */
-  /**
-   * Whether the table has agreed to look at the odds before voting.
-   *
-   * Per round, and it resets with the draft, so the agreement is made afresh each time rather than
-   * switched on once and forgotten.
-   */
-  areOddsRevealed?: boolean | undefined;
   chancellorClaim?: number | undefined;
   chancellorId?: string | undefined;
   enacted?: Policy | undefined;
@@ -122,6 +122,13 @@ interface Draft {
    */
   isVetoed?: boolean | undefined;
 
+  /**
+   * Set once the table says the vote is finished.
+   *
+   * Without it the outcome has to be guessed from how many votes happen to be in, which makes the
+   * form resolve early and jump about while people are still voting — and leaves no way to tell a
+   * finished unanimous ja from a vote still in progress.
+   */
   isVoteConfirmed?: boolean | undefined;
 
   /** What the President said the top three were, in order. Sparse until he says. */
@@ -198,6 +205,7 @@ const MAX_NAME_LENGTH = 16;
 const state: AppState = {
   draft: createDraft(),
   inspectedPlayerId: undefined,
+  isAnalysisVisible: false,
   isHistoryOpen: false,
   phase: 'setup',
   players: createPlayers(MIN_PLAYER_COUNT),
@@ -882,8 +890,8 @@ function render(): void {
    */
   const isReviewing = state.selectedRoundIndex !== undefined;
   const outcome = getDraftOutcome();
-  const showReadout = isReviewing
-    || (!committedAnalysis.victory && (outcome === 'elected' || outcome === 'pending'));
+  const showReadout = state.isAnalysisVisible
+    && (isReviewing || (!committedAnalysis.victory && (outcome === 'elected' || outcome === 'pending')));
 
   const scrollPositions = captureScrollPositions(appRoot);
 
@@ -900,6 +908,31 @@ function render(): void {
   );
 
   restoreScrollPositions(appRoot, scrollPositions);
+}
+
+/*
+ * The switch itself. Named for what it gives rather than for its state, so a table that has never
+ * seen it can tell what tapping it will do.
+ */
+function renderAnalysisToggle(): HTMLElement {
+  return element('button', {
+    onClick: () => {
+      state.isAnalysisVisible = !state.isAnalysisVisible;
+
+      if (!state.isAnalysisVisible) {
+        state.isHistoryOpen = false;
+        state.inspectedPlayerId = undefined;
+        state.selectedRoundIndex = undefined;
+      }
+
+      render();
+    },
+    pressed: state.isAnalysisVisible,
+    text: 'Analysis',
+    title: state.isAnalysisVisible
+      ? 'hide the history and the odds again'
+      : 'let the app remember and calculate — everyone sees the same thing'
+  });
 }
 
 function renderAssumption(index: number, round: Round): HTMLElement {
@@ -984,16 +1017,15 @@ function renderBoard(analysis: GameAnalysis): HTMLElement {
 
   return element('header', { className: 'board' }, [
     /*
-     * The short form here, the full name on the setup screen and in the browser tab. The header also
-     * carries three tracks and two buttons, and at a readable type size the full name is the thing
-     * that has to give — it was truncating mid-word, which is worse than simply
-     * saying less.
+     * No title during play. The header carries two tracks, the election tracker and three buttons,
+     * and the name is the one thing there that tells nobody anything — it had been squeezed to a
+     * single letter and an ellipsis. It survives on the setup screen and in the browser tab.
      */
-    element('div', { className: 'board__title', text: 'Secret Hitler' }),
     renderTrack('Liberal laws', analysis.enactedLiberalCount, LIBERAL_TRACK_LENGTH, 'pip--liberal'),
     renderTrack('Fascist laws', analysis.enactedFascistCount, FASCIST_TRACK_LENGTH, 'pip--fascist'),
     renderTrack('Tracker', tracker, ELECTION_TRACKER_LIMIT, 'pip--tracker'),
-    renderHistoryButton(),
+    renderAnalysisToggle(),
+    ...(state.isAnalysisVisible ? [renderHistoryButton()] : []),
     renderNewGame()
   ]);
 }
@@ -1215,17 +1247,24 @@ function renderDossier(playerId: string, analysis: GameAnalysis): HTMLElement {
     }));
   }
 
-  const governments = state.rounds
-    .map((round, roundIndex) => renderGovernmentLine(round, roundIndex, playerId))
-    .filter((entry): entry is HTMLElement => entry !== undefined);
+  /*
+   * Above this line are facts a player can see by looking at the table: the Hitler check was
+   * answered out loud, and a dead man is visibly out. Below it is the app's memory of what was said
+   * and done, which is the part the switch governs.
+   */
+  if (state.isAnalysisVisible) {
+    const governments = state.rounds
+      .map((round, roundIndex) => renderGovernmentLine(round, roundIndex, playerId))
+      .filter((entry): entry is HTMLElement => entry !== undefined);
 
-  if (governments.length === 0) {
-    lines.push(element('div', { text: 'No governments yet' }));
-  } else {
-    lines.push(...governments);
+    if (governments.length === 0) {
+      lines.push(element('div', { text: 'No governments yet' }));
+    } else {
+      lines.push(...governments);
+    }
+
+    lines.push(...renderDossierClaims(playerId));
   }
-
-  lines.push(...renderDossierClaims(playerId));
 
   return element('div', { className: 'dossier' }, [
     renderDossierHeader(playerId, index),
@@ -1894,22 +1933,6 @@ function renderNewGame(): HTMLElement {
  * A hand ranking is read backwards by a liar picking a story; a decision is not.
  */
 function renderOdds(): HTMLElement[] {
-  if (state.draft.areOddsRevealed !== true) {
-    return [
-      element('div', { className: 'field' }, [
-        element('button', {
-          className: 'pin',
-          onClick: () => {
-            state.draft.areOddsRevealed = true;
-            render();
-          },
-          text: 'reveal the odds'
-        }),
-        element('span', { className: 'deck__note', text: 'agree first — the whole table sees this' })
-      ])
-    ];
-  }
-
   const deck = analyseGame({ players: state.players, rounds: state.rounds }).deckAfter;
   const distribution = getDrawDistribution(deck);
   const fascistOnTop = getTopCardFascistProbability(deck);

@@ -89,10 +89,21 @@ Two different findings, and conflating them would be a real error:
 
 Neither is scored. A conflict is a proof; a weird play is an observation.
 
-### The odds, and why they are behind a tap
+### One switch over everything the app knows
 
-The deck odds are shown **only before the vote, and only after the table taps to reveal them**. Do
-not make them permanent, and do not surface them once a government has formed.
+`state.isAnalysisVisible` is **off by default** and governs the history, the deck composition, the
+odds, every claim verdict, and the dossier's record of a player. What stays visible is what a player
+could see by sitting at the table: the two tracks, the election tracker, who is dead, who survived
+the Hitler check, and the form for recording the round. Recording is never blocked — the switch
+decides what the players are told, not what is kept.
+
+Do not quietly widen what escapes it. A verdict leaking through, say, a history badge while the
+switch is off defeats the whole thing.
+
+### Why the odds in particular are worth guarding
+
+The deck odds are shown **only before the vote, and only when the switch above is on**. Do not
+surface them once a government has formed.
 
 The reasoning, because it is not obvious and was got wrong twice:
 
@@ -105,9 +116,9 @@ The reasoning, because it is not obvious and was got wrong twice:
 - **No display can deny him the numbers.** Hiding them from the President and Chancellor candidates
   does not work: another Fascist reads the screen and nods. Anything shown to anyone is available to
   the Fascist team.
-- What can be denied is *quiet, constant* access. Behind a public tap he must ask the table to turn
-  them over, in front of the people he is lying to, and wanting to look is itself information for
-  everyone else.
+- What can be denied is *quiet, constant* access. Behind a switch the table has to agree to turn on,
+  in front of the people he would be lying to, and wanting it on is itself information for everyone
+  else.
 
 Phrase them as decisions, never as a ranking of hands: a ranking is read backwards by a liar
 choosing a story. The pile's composition (`11F 6L`) stays visible throughout, being plain bookkeeping
