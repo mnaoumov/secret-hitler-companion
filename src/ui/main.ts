@@ -777,6 +777,26 @@ function getImpliedExecutionReveal(): boolean | undefined {
   return false;
 }
 
+/**
+ * Everyone already investigated, against the round it happened in.
+ *
+ * Filed rounds only. The draft's own target is not in here, because a President who has just named
+ * someone must still be able to change his mind and name somebody else.
+ */
+function getInvestigatedRounds(): ReadonlyMap<string, number> {
+  const investigated = new Map<string, number>();
+
+  state.rounds.forEach((round, index) => {
+    const targetId = round.investigation?.targetId;
+
+    if (targetId !== undefined && !investigated.has(targetId)) {
+      investigated.set(targetId, index + 1);
+    }
+  });
+
+  return investigated;
+}
+
 function getLieSubject(actor: 'chancellor' | 'president' | 'unknown', view: ReadoutView): string {
   if (actor === 'unknown') {
     return 'One of them is';
@@ -818,7 +838,10 @@ function getPolicyClassName(value: Policy | undefined): string {
   return value === Policy.Fascist ? 'is-fascist' : 'is-liberal';
 }
 
-function getPowerTargetIneligibility(deadIds: ReadonlySet<string>): ReadonlyMap<string, Ineligibility> {
+function getPowerTargetIneligibility(
+  key: 'executionTargetId' | 'investigationTargetId' | 'specialElectionTargetId',
+  deadIds: ReadonlySet<string>
+): ReadonlyMap<string, Ineligibility> {
   /*
    * No power may be aimed at the man holding it. A Special Election is rulebook-explicit — the
    * President chooses "any other player at the table" — and the table's ruling extends the same to
@@ -826,6 +849,23 @@ function getPowerTargetIneligibility(deadIds: ReadonlySet<string>): ReadonlyMap<
    */
   const selfId = state.draft.presidentId;
   const ineligible = new Map<string, Ineligibility>();
+
+  /*
+   * "No player may be investigated twice in the same game." Only reachable at nine and ten seats,
+   * where the power fires on both the first and the second Fascist law — every other board grants
+   * it once, so there is never a second President to spend it.
+   *
+   * Set before the two below so that being dead, or being the man holding the power, wins: those
+   * say more about the seat in front of you than a card someone read four rounds ago.
+   */
+  if (key === 'investigationTargetId') {
+    for (const [playerId, roundNumber] of getInvestigatedRounds()) {
+      ineligible.set(playerId, {
+        note: 'investigated',
+        reason: `already investigated in round ${String(roundNumber)} — nobody may be investigated twice`
+      });
+    }
+  }
 
   for (const playerId of deadIds) {
     ineligible.set(playerId, { note: 'executed', reason: 'executed — no longer at the table' });
@@ -2709,7 +2749,7 @@ function renderPowerTarget(
   deadIds: ReadonlySet<string>,
   isLocked: boolean
 ): HTMLElement {
-  const ineligible = getPowerTargetIneligibility(deadIds);
+  const ineligible = getPowerTargetIneligibility(key, deadIds);
 
   const buttons = state.players.map((player, index) => {
     const reason = isLocked ? 'the government answers first' : ineligible.get(player.id)?.reason;
