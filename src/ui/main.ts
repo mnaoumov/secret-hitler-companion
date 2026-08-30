@@ -514,12 +514,16 @@ function getDefaultName(index: number): string {
 // ---------- entry ----------
 
 /** A seat with no name typed shows its number rather than becoming an unlabelled button. */
-function getDiscardButtonTitle(isLocked: boolean, isMissing: boolean): string {
+function getDiscardButtonTitle(isLocked: boolean, isMissing: boolean, hasNoChoice: boolean): string {
   if (isLocked) {
     return 'ask him what he drew first';
   }
 
-  return isMissing ? 'he says he was not holding one' : '';
+  if (isMissing) {
+    return 'he says he was not holding one';
+  }
+
+  return hasNoChoice ? 'his own claim already says which card went' : '';
 }
 
 function getDisplayName(index: number): string {
@@ -2260,32 +2264,36 @@ function renderPresidentDiscardField(): HTMLElement {
   const isLocked = claim === undefined;
 
   /*
-   * Nothing here is locked because the answer is implied.
+   * The row is dead when only one answer can be recorded at all — which is not the same test as
+   * "the answer is implied", and the difference is the whole of it.
    *
-   * An earlier version froze the row for FFF and LLL, on the grounds that his hand left him no
-   * choice — but the hand is itself only what he SAYS he drew, exactly like the FFL-under-a-Liberal
-   * case that is implied by his claim plus the board. There is no line between the two, so both are
-   * filled in and both stay editable, and a man who contradicts his own account can be recorded
-   * doing it.
+   * FFL under a Liberal law implies he discarded the Fascist, but "I discarded the Liberal" is still
+   * a statement a man can make: it means he passed FF, it contradicts the board, and the readout
+   * says so. Two representable answers, so both stay live.
    *
-   * The one option that does stay dead is a colour his claimed hand never held. That is not a
-   * judgement about plausibility: `formatHand` throws on a pass of three cards, so "I drew FFF and
-   * discarded a Liberal" would take the analysis down rather than be reported as the nonsense it is.
+   * FFF implies the same way and does not leave a second answer. "I discarded a Liberal" is not a
+   * rival claim, it is an incoherent one — he says he was holding none — and it cannot even be
+   * represented, since `formatHand` throws on a three-Fascist pass out of two cards. That leaves the
+   * one live button able to do exactly one thing: clear the answer to "he has not said", a state
+   * that cannot exist, because claiming FFF is itself saying which card went.
    */
+  const representable = [Policy.Liberal, Policy.Fascist].filter((policy) => isDiscardPossible(claim, policy));
+  const hasNoChoice = !isLocked && representable.length <= 1;
+
   const buttons = [Policy.Liberal, Policy.Fascist].map((policy) => {
     // He cannot discard a colour he says he never held, so LLL offers no Fascist and FFF no Liberal.
     const isMissing = !isLocked && !isDiscardPossible(claim, policy);
 
     return element('button', {
       className: policy === Policy.Fascist ? 'is-fascist' : 'is-liberal',
-      disabled: isLocked || isMissing,
+      disabled: isLocked || isMissing || hasNoChoice,
       onClick: () => {
         state.draft.presidentDiscard = state.draft.presidentDiscard === policy ? undefined : policy;
         render();
       },
       pressed: state.draft.presidentDiscard === policy,
       text: policy === Policy.Fascist ? 'Fascist' : 'Liberal',
-      title: getDiscardButtonTitle(isLocked, isMissing)
+      title: getDiscardButtonTitle(isLocked, isMissing, hasNoChoice)
     });
   });
 
