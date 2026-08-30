@@ -947,9 +947,9 @@ function renderAssumption(index: number, round: Round): HTMLElement {
     element('button', {
       /*
        * The toggles start with every consistent hand switched on, so "selected" says nothing about
-       * what he said — and with three of them lit there was no way to tell his claim from the
-       * default. The claimed one is underlined in his own colour, which survives the pressed state
-       * and costs no layout.
+       * what he said — and with three of them lit there is no telling his claim from the default.
+       * The claimed one is filled in his own colour, which reads at a glance across a room and
+       * survives the pressed state, where an underline was too fine to see.
        */
       className: fascistCount === round.presidentClaim ? 'pin hand is-claimed' : 'pin hand',
       onClick: () => {
@@ -964,27 +964,9 @@ function renderAssumption(index: number, round: Round): HTMLElement {
     }, renderHand(fascistCount, DRAW_SIZE))
   );
 
-  /*
-   * The claim is named on its own line above the toggles, in the President's colour.
-   *
-   * It has to be stated rather than left to the marker: the toggles start with every consistent hand
-   * switched on, so a lit strip is the resting state and says nothing about what was claimed, and a
-   * round where nobody claimed anything looked exactly like one whose marker had been missed. It
-   * says "President" rather than "he" because the line sits under a row naming two men.
-   */
-  const claimLine = element('div', { className: 'history__claim-line' }, [
-    element('span', { className: 'history__assume-label is-president', text: 'President\'s claim' }),
-    ...(round.presidentClaim === undefined
-      ? [element('span', { className: 'claim__value claim__unknown', text: '?'.repeat(DRAW_SIZE) })]
-      : [element('span', { className: 'claim__value' }, renderHand(round.presidentClaim, DRAW_SIZE))])
-  ]);
-
-  return element('div', { className: 'history__assume-group' }, [
-    claimLine,
-    element('div', { className: 'history__assume' }, [
-      element('span', { className: 'history__assume-label', text: 'assume' }),
-      ...toggles
-    ])
+  return element('div', { className: 'history__assume' }, [
+    element('span', { className: 'history__assume-label', text: 'assume' }),
+    ...toggles
   ]);
 }
 

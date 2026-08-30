@@ -14,6 +14,7 @@
   --liberal: #3d6ea8;
   --muted: #6d6459;
   --panel: #f2ede4;
+  --president-tint: #e6dff5;
   --president: #6b4fa8;
   --surface: #fbf8f2;
   --text: #221e1a;
@@ -36,6 +37,7 @@
     --liberal: #7aa8dd;
     --muted: #9a9083;
     --panel: #1c1a17;
+    --president-tint: #2d2640;
     --president: #a98fe0;
     --surface: #131211;
     --text: #ece5da;
@@ -53,6 +55,7 @@
   --liberal: #7aa8dd;
   --muted: #9a9083;
   --panel: #1c1a17;
+  --president-tint: #2d2640;
   --president: #a98fe0;
   --surface: #131211;
   --text: #ece5da;
@@ -924,12 +927,16 @@ button.hand[aria-pressed='true'] {
  * rather than boxed: it has to stay legible on top of the selection ring, and it must not change the
  * button's size.
  */
-button.is-claimed {
+/*
+ * What the President actually claimed, as opposed to what is currently assumed about him. A fill
+ * rather than an underline: the strip is small type on a card read across a room, and a rule under
+ * two letters was too fine to find. The selector is repeated for the pressed state so that the fill
+ * survives being selected, which it will be by default.
+ */
+button.is-claimed,
+button.is-claimed[aria-pressed='true'] {
+  background: var(--president-tint);
   border-color: var(--president);
-  text-decoration: underline;
-  text-decoration-color: var(--president);
-  text-decoration-thickness: 0.14em;
-  text-underline-offset: 0.18em;
 }
 
 /*
@@ -1006,18 +1013,6 @@ button.is-claimed {
   align-items: stretch;
   display: flex;
   gap: 0.5em;
-}
-
-.history__assume-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15em;
-}
-
-.history__claim-line {
-  align-items: baseline;
-  display: flex;
-  gap: 0.3em;
 }
 
 .history__assume {
