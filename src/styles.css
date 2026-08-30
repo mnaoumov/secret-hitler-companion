@@ -332,6 +332,12 @@ body {
   color: #fff;
 }
 
+/* Louder than either victory: this one is not a result, it is a fault in the record. */
+.victory--error {
+  background: var(--impossible);
+  color: #fff;
+}
+
 /* ---------- name editor ---------- */
 
 .names {

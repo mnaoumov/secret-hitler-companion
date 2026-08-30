@@ -1064,6 +1064,7 @@ function render(): void {
   appRoot.append(
     renderBoard(committedAnalysis),
     ...renderPlayersBar(committedAnalysis),
+    ...renderImpossibleHitler(committedAnalysis),
     ...renderVictory(committedAnalysis),
     element('div', { className: 'main' }, [
       ...(committedAnalysis.victory ? [] : [renderEntry(committedAnalysis)]),
@@ -1957,6 +1958,31 @@ function renderHitlerCheck(analysis: GameAnalysis): HTMLElement[] {
         pressed: state.draft.hitlerCheckAnswer === answer.value,
         text: answer.label
       })
+    )
+  ])];
+}
+
+/*
+ * The one thing the app will say is wrong rather than merely odd.
+ *
+ * Every other finding is about what players claimed; this is about the record itself having become
+ * impossible, so it is worded as something to go and fix rather than something to reason about.
+ */
+function renderImpossibleHitler(analysis: GameAnalysis): HTMLElement[] {
+  if (!analysis.hasImpossibleHitler) {
+    return [];
+  }
+
+  return [element('div', { className: 'victory victory--error' }, [
+    element('strong', { text: 'Impossible record' }),
+    element(
+      'span',
+      {},
+      renderPhrase(
+        ' — everyone still alive has been proved not to be Hitler, and Hitler is one of the players.'
+          + ' A round has been entered wrongly, or somebody answered the Hitler question untruthfully,'
+          + ' which the rules do not allow.'
+      )
     )
   ])];
 }

@@ -55,6 +55,19 @@ export interface GameAnalysis {
   readonly deckAfter: DeckState;
   readonly enactedFascistCount: number;
   readonly enactedLiberalCount: number;
+
+  /**
+   * Set when the record has proved that nobody left alive is Hitler, which cannot be true.
+   *
+   * Hitler is one of the players. Surviving the zone check proves a Chancellor is not him, so if
+   * every living player has survived it, one of those answers was a lie — the rules force the truth
+   * there, so what has really happened is that a round was recorded wrongly.
+   *
+   * Not raised when Hitler has been executed: he is then accounted for, and the living being clear
+   * of suspicion is exactly what one would expect.
+   */
+  readonly hasImpossibleHitler: boolean;
+
   readonly isFascistVictoryByHitler: boolean;
 
   /**
@@ -312,6 +325,16 @@ export function analyseGame(game: Game): GameAnalysis {
 
   const lastReshuffleIndex = rounds.findLastIndex((round) => round.didReshuffle);
 
+  const wasHitlerExecuted = game.rounds.some((round) => round.wasExecutedPlayerHitler === true);
+
+  /*
+   * Everyone still at the table has been cleared, and Hitler has not been shot. He is therefore
+   * nowhere, which is not a state the game has.
+   */
+  const hasImpossibleHitler = !wasHitlerExecuted
+    && game.players.length > 0
+    && game.players.every((player) => deadPlayerIds.includes(player.id) || confirmedNotHitler.includes(player.id));
+
   return {
     confirmedNotHitler,
     currentCycleStartIndex: lastReshuffleIndex + 1,
@@ -319,6 +342,7 @@ export function analyseGame(game: Game): GameAnalysis {
     deckAfter: rounds.at(-1)?.deckAfter ?? createFullDeck(),
     enactedFascistCount,
     enactedLiberalCount,
+    hasImpossibleHitler,
     isFascistVictoryByHitler,
     nextPresidentId: getNextPresidentId(game, deadPlayerIds),
     rounds,
@@ -332,7 +356,7 @@ export function analyseGame(game: Game): GameAnalysis {
       enactedFascistCount,
       enactedLiberalCount,
       isFascistVictoryByHitler,
-      wasHitlerExecuted: game.rounds.some((round) => round.wasExecutedPlayerHitler === true)
+      wasHitlerExecuted
     })
   };
 }

@@ -772,3 +772,88 @@ describe('executions', () => {
     expect(analysis.deadPlayerIds).toEqual(['echo']);
   });
 });
+
+describe('an impossible Hitler', () => {
+  /*
+   * Hitler is one of the players and the zone check is the one answer the rules force to be honest,
+   * so clearing everybody is not a suspicious record, it is a broken one.
+   */
+  function buildClearedGame(clearedIds: readonly string[]): Round[] {
+    const threeFascistLaws: Round[] = Array.from({ length: 3 }, () => ({
+      chancellorId: 'bravo',
+      enacted: Policy.Fascist,
+      presidentId: 'alpha',
+      wasElected: true
+    }));
+
+    return [
+      ...threeFascistLaws,
+      ...clearedIds.map((chancellorId) => ({
+        chancellorId,
+        enacted: Policy.Liberal,
+        hitlerCheckAnswer: 'no' as const,
+        presidentId: 'alpha',
+        wasElected: true
+      }))
+    ];
+  }
+
+  it('says nothing while somebody could still be him', () => {
+    const analysis = analyseGame(buildGame(buildClearedGame(['alpha', 'bravo', 'charlie', 'delta'])));
+
+    expect(analysis.confirmedNotHitler).toHaveLength(4);
+    expect(analysis.hasImpossibleHitler).toBe(false);
+  });
+
+  it('objects once the last living player has been cleared', () => {
+    const analysis = analyseGame(buildGame(buildClearedGame(['alpha', 'bravo', 'charlie', 'delta', 'echo'])));
+
+    expect(analysis.hasImpossibleHitler).toBe(true);
+  });
+
+  /*
+   * With Hitler shot there is nobody left to be him, and everyone alive being clear is exactly what
+   * the record should look like.
+   */
+  it('accepts everyone being cleared once Hitler has been executed', () => {
+    const rounds = buildClearedGame(['alpha', 'bravo', 'charlie', 'delta']);
+    const analysis = analyseGame(buildGame([
+      ...rounds,
+      {
+        chancellorId: 'bravo',
+        enacted: Policy.Fascist,
+        executionTargetId: 'echo',
+        presidentId: 'alpha',
+        wasElected: true,
+        wasExecutedPlayerHitler: true
+      }
+    ]));
+
+    expect(analysis.deadPlayerIds).toContain('echo');
+    expect(analysis.hasImpossibleHitler).toBe(false);
+  });
+
+  it('counts an executed player as accounted for rather than as a suspect', () => {
+    const rounds = buildClearedGame(['alpha', 'bravo', 'charlie']);
+    const analysis = analyseGame(buildGame([
+      ...rounds,
+      {
+        chancellorId: 'bravo',
+        enacted: Policy.Fascist,
+        executionTargetId: 'delta',
+        presidentId: 'alpha',
+        wasElected: true,
+        wasExecutedPlayerHitler: false
+      },
+      {
+        chancellorId: 'echo',
+        enacted: Policy.Liberal,
+        hitlerCheckAnswer: 'no',
+        presidentId: 'alpha',
+        wasElected: true
+      }
+    ]));
+
+    expect(analysis.hasImpossibleHitler).toBe(true);
+  });
+});
