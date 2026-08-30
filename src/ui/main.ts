@@ -2174,28 +2174,54 @@ function renderNewGame(): HTMLElement[] {
 function renderOdds(): HTMLElement[] {
   const deck = analyseGame({ players: state.players, rounds: state.rounds }).deckAfter;
   const distribution = getDrawDistribution(deck);
-  const fascistOnTop = getTopCardFascistProbability(deck);
 
-  const lines = [
-    { label: 'A government you trust enacts a Liberal law', value: 1 - (distribution[DRAW_SIZE] ?? 0) },
-    {
-      label: 'A Fascist President could force a Fascist law',
-      value: (distribution[DRAW_SIZE] ?? 0) + (distribution[DRAW_SIZE - 1] ?? 0)
-    },
-    { label: 'Letting the vote fail turns up a Liberal law', value: 1 - fascistOnTop }
+  /*
+   * What each pairing does with the draw, assuming both play for their own side.
+   *
+   * The President discards one and passes two; the Chancellor enacts one of those. Work through
+   * where a Fascist law can come from, with `k` the number of Fascists drawn:
+   *
+   * - Two Fascists pass the most Fascist pair and enact from it, so any Fascist at all is enough:
+   *   `k >= 1`.
+   * - A Fascist President with a Liberal Chancellor has to hand over FF to force his hand, which
+   *   takes `k >= 2`. A Liberal President with a Fascist Chancellor buries one Fascist and still
+   *   hands over one when `k >= 2` — the same threshold from the other side, which is why the two
+   *   mixed governments share a number.
+   * - Two Liberals bury a Fascist and enact the Liberal, so only a hand with no Liberal in it can
+   *   betray them: `k = 3`.
+   */
+  const anyFascist = 1 - (distribution[0] ?? 0);
+  const twoFascists = (distribution[DRAW_SIZE] ?? 0) + (distribution[DRAW_SIZE - 1] ?? 0);
+  const allFascist = distribution[DRAW_SIZE] ?? 0;
+
+  const governments = [
+    { chancellor: 'Fascist', president: 'Fascist', value: anyFascist },
+    { chancellor: 'Liberal', president: 'Fascist', value: twoFascists },
+    { chancellor: 'Fascist', president: 'Liberal', value: twoFascists },
+    { chancellor: 'Liberal', president: 'Liberal', value: allFascist }
   ];
 
+  const rows = governments.map((government) =>
+    element('div', { className: 'field' }, [
+      element('span', {}, renderPhrase(`${government.president} President with a ${government.chancellor} Chancellor`)),
+      element('span', { className: 'claim__value', text: formatPercentage(government.value) })
+    ])
+  );
+
   return [
-    element(
-      'div',
-      { className: 'claim' },
-      lines.map((line) =>
-        element('div', { className: 'field' }, [
-          element('span', {}, renderPhrase(line.label)),
-          element('span', { className: 'claim__value', text: formatPercentage(line.value) })
-        ])
-      )
-    )
+    element('div', { className: 'claim' }, [
+      element('div', { className: 'claim__title' }, renderPhrase('Chance of a Fascist law, by who is in the government')),
+      ...rows
+    ]),
+    element('div', { className: 'claim' }, [
+      element('div', { className: 'field' }, [
+        element('span', {}, renderPhrase('Letting the vote fail turns up a Liberal law')),
+        element('span', {
+          className: 'claim__value',
+          text: formatPercentage(1 - getTopCardFascistProbability(deck))
+        })
+      ])
+    ])
   ];
 }
 
