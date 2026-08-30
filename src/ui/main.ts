@@ -498,12 +498,16 @@ function getDefaultName(index: number): string {
 // ---------- entry ----------
 
 /** A seat with no name typed shows its number rather than becoming an unlabelled button. */
-function getDiscardButtonTitle(isLocked: boolean, isMissing: boolean): string {
+function getDiscardButtonTitle(isLocked: boolean, isMissing: boolean, isForced: boolean): string {
   if (isLocked) {
     return 'ask him what he drew first';
   }
 
-  return isMissing ? 'he says he was not holding one' : '';
+  if (isMissing) {
+    return 'he says he was not holding one';
+  }
+
+  return isForced ? 'nothing to choose — he says all three were the same' : '';
 }
 
 function getDisplayName(index: number): string {
@@ -560,6 +564,29 @@ function getDraftRound(): Round {
     votes: state.draft.votes,
     wasElected
   };
+}
+
+/**
+ * Whether this round is the one that throws the country into chaos.
+ *
+ * The tracker counts inactive governments, and both a rejection and a veto are inactive, so this
+ * reads the same for either — one more and the populace enacts the top card itself.
+ */
+/** Whether the session has an outcome yet — a policy on the table, or a veto. */
+/** Whether a claimed hand could have contained the card the President says he discarded. */
+/**
+ * The card a claimed hand leaves him no choice about.
+ *
+ * FFF and LLL are the only hands where the discard is decided by the claim itself, and they are the
+ * same two hands that make the pass forced — the reason those cases give an exact answer everywhere
+ * else in the app.
+ */
+function getForcedDiscard(claim: number | undefined): Policy | undefined {
+  if (claim === DRAW_SIZE) {
+    return Policy.Fascist;
+  }
+
+  return claim === 0 ? Policy.Liberal : undefined;
 }
 
 function getLieSubject(actor: 'chancellor' | 'president' | 'unknown', view: ReadoutView): string {
@@ -734,6 +761,8 @@ function isChaosImminent(analysis: GameAnalysis): boolean {
   return (analysis.rounds.at(-1)?.electionTracker ?? 0) + 1 >= ELECTION_TRACKER_LIMIT;
 }
 
+// ---------- readout ----------
+
 /** Still carrying the name it was born with, whether that was left alone or typed back in. */
 function isDefaultName(index: number): boolean {
   const name = (state.players[index]?.name ?? '').trim();
@@ -741,16 +770,6 @@ function isDefaultName(index: number): boolean {
   return name === '' || name === getDefaultName(index);
 }
 
-// ---------- readout ----------
-
-/**
- * Whether this round is the one that throws the country into chaos.
- *
- * The tracker counts inactive governments, and both a rejection and a veto are inactive, so this
- * reads the same for either — one more and the populace enacts the top card itself.
- */
-/** Whether the session has an outcome yet — a policy on the table, or a veto. */
-/** Whether a claimed hand could have contained the card the President says he discarded. */
 function isDiscardPossible(claim: number | undefined, discard: Policy | undefined): boolean {
   if (claim === undefined || discard === undefined) {
     return true;
@@ -2131,10 +2150,28 @@ function renderPresidentClaimField(): HTMLElement {
       className: 'hand',
       disabled: isLocked,
       onClick: () => {
+        const wasForced = getForcedDiscard(state.draft.presidentClaim) !== undefined;
+
         state.draft.presidentClaim = state.draft.presidentClaim === fascistCount ? undefined : fascistCount;
 
-        // A hand he no longer claims to have held cannot have supplied the card he claims he discarded.
-        if (!isDiscardPossible(state.draft.presidentClaim, state.draft.presidentDiscard)) {
+        /*
+         * Three of a kind leaves him nothing to decide, so the answer is filled in rather than
+         * asked for.
+         *
+         * The answer is dropped again in two cases: the new hand cannot have supplied the card he
+         * claims he discarded, or the old one had filled it in for him and the new one does not.
+         * That second case matters — correcting a mis-tapped FFF to FFL would otherwise leave the
+         * app asserting a discard nobody had said out loud.
+         */
+        const forced = getForcedDiscard(state.draft.presidentClaim);
+
+        if (forced !== undefined) {
+          state.draft.presidentDiscard = forced;
+        } else if (
+          wasForced
+          || state.draft.presidentClaim === undefined
+          || !isDiscardPossible(state.draft.presidentClaim, state.draft.presidentDiscard)
+        ) {
           state.draft.presidentDiscard = undefined;
         }
 
@@ -2162,20 +2199,27 @@ function renderPresidentDiscardField(): HTMLElement {
   const claim = state.draft.presidentClaim;
   const isLocked = claim === undefined;
 
+  /*
+   * FFF and LLL decide this for him: whichever card he discarded, it was the same colour as the
+   * other two. It is filled in and both buttons go dead — leaving a live button for an answer that
+   * has only one possible value invites a tap that can only ever confirm what is already known.
+   */
+  const forced = getForcedDiscard(claim);
+
   const buttons = [Policy.Liberal, Policy.Fascist].map((policy) => {
     // He cannot discard a colour he says he never held, so LLL offers no Fascist and FFF no Liberal.
     const isMissing = !isLocked && !isDiscardPossible(claim, policy);
 
     return element('button', {
       className: policy === Policy.Fascist ? 'is-fascist' : 'is-liberal',
-      disabled: isLocked || isMissing,
+      disabled: isLocked || isMissing || forced !== undefined,
       onClick: () => {
         state.draft.presidentDiscard = state.draft.presidentDiscard === policy ? undefined : policy;
         render();
       },
       pressed: state.draft.presidentDiscard === policy,
       text: policy === Policy.Fascist ? 'Fascist' : 'Liberal',
-      title: getDiscardButtonTitle(isLocked, isMissing)
+      title: getDiscardButtonTitle(isLocked, isMissing, forced !== undefined)
     });
   });
 
@@ -2473,7 +2517,7 @@ function renderVotesField(): HTMLElement {
   const isConfirmed = state.draft.isVoteConfirmed === true;
 
   return element('div', { className: 'field' }, [
-    element('span', { className: 'field__label', text: 'Votes' }),
+    element('span', { className: 'field__label', text: 'Votes for the government' }),
     ...buttons,
     element('span', {
       className: 'deck__note',
