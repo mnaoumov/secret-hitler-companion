@@ -825,6 +825,23 @@ function isHand(part: string): boolean {
   return /^[FL]{2,3}$/.test(part);
 }
 
+/*
+ * The Hitler check is the one statement the rules force to be truthful, so surviving it is proof
+ * rather than testimony. It only means anything inside the zone, so it only appears there.
+ */
+/**
+ * Whether the Chancellor still has to be asked whether he is Hitler.
+ *
+ * The general rule for the form is that a row stays dead until every row above it has an answer, so
+ * the table works down it in the order the round actually happens. This is the one dependency that
+ * could not be read off the draft alone: the question exists only inside the Hitler zone.
+ */
+function isHitlerCheckPending(analysis: GameAnalysis): boolean {
+  return analysis.enactedFascistCount >= HITLER_ZONE_THRESHOLD
+    && state.draft.chancellorId !== undefined
+    && state.draft.hitlerCheckAnswer === undefined;
+}
+
 /**
  * Whether the Chancellor just answered that he is Hitler.
  *
@@ -1733,6 +1750,8 @@ function renderHistorySeats(round: Round): HTMLElement {
   ]);
 }
 
+// ---------- history ----------
+
 function renderHistoryVotes(round: Round): HTMLElement[] {
   const votes = round.votes;
 
@@ -1756,12 +1775,6 @@ function renderHistoryVotes(round: Round): HTMLElement[] {
   })];
 }
 
-// ---------- history ----------
-
-/*
- * The Hitler check is the one statement the rules force to be truthful, so surviving it is proof
- * rather than testimony. It only means anything inside the zone, so it only appears there.
- */
 function renderHitlerCheck(analysis: GameAnalysis): HTMLElement[] {
   if (analysis.enactedFascistCount < HITLER_ZONE_THRESHOLD || state.draft.chancellorId === undefined) {
     return [];
@@ -1827,17 +1840,26 @@ function renderInvestigation(deadIds: ReadonlySet<string>): HTMLElement[] {
    * ordinary Fascist. Saying "party" keeps that from being read as either of the other two.
    */
   const reports = [
-    { label: 'said Liberal party', policy: Policy.Liberal },
-    { label: 'said Fascist party', policy: Policy.Fascist }
+    { label: 'Liberal party', policy: Policy.Liberal },
+    { label: 'Fascist party', policy: Policy.Fascist }
   ];
 
   return [
     renderPowerTarget('Investigate', 'investigationTargetId', deadIds),
     element('div', { className: 'field field--power' }, [
-      element('span', { className: 'field__label', text: 'Reported party' }),
+      /*
+       * The label carries the whole sentence and the buttons finish it, so what is being recorded is
+       * unmistakable: a claim the President makes, not the card he was shown. He may say anything he
+       * likes about it, or nothing.
+       */
+      element('span', {
+        className: 'field__label is-president',
+        text: 'President claims that investigated player belongs to'
+      }),
       ...reports.map((report) =>
         element('button', {
           className: report.policy === Policy.Fascist ? 'is-fascist' : 'is-liberal',
+          disabled: state.draft.investigationTargetId === undefined,
           onClick: () => {
             state.draft.investigationReported = state.draft.investigationReported === report.policy
               ? undefined
@@ -1845,7 +1867,8 @@ function renderInvestigation(deadIds: ReadonlySet<string>): HTMLElement[] {
             render();
           },
           pressed: state.draft.investigationReported === report.policy,
-          text: report.label
+          text: report.label,
+          title: state.draft.investigationTargetId === undefined ? 'name who was investigated first' : ''
         })
       )
     ])
@@ -2075,9 +2098,16 @@ function renderPlayersBar(analysis: GameAnalysis): HTMLElement[] {
 }
 
 function renderPolicyField(analysis: GameAnalysis): HTMLElement {
+  /*
+   * In the zone the question is asked the moment the government forms, before anyone draws — so the
+   * session cannot have an outcome until it has been answered.
+   */
+  const isLocked = isHitlerCheckPending(analysis);
+
   const buttons = [Policy.Liberal, Policy.Fascist].map((policy) =>
     element('button', {
       className: policy === Policy.Fascist ? 'is-fascist' : 'is-liberal',
+      disabled: isLocked,
       onClick: () => {
         const wasImplied = getImpliedDiscard(state.draft.presidentClaim, state.draft.enacted) !== undefined;
 
@@ -2089,7 +2119,8 @@ function renderPolicyField(analysis: GameAnalysis): HTMLElement {
         render();
       },
       pressed: state.draft.enacted === policy && state.draft.isVetoed !== true,
-      text: policy === Policy.Fascist ? 'Fascist' : 'Liberal'
+      text: policy === Policy.Fascist ? 'Fascist' : 'Liberal',
+      title: isLocked ? 'ask the Chancellor whether he is Hitler first' : ''
     })
   );
 
@@ -2100,6 +2131,7 @@ function renderPolicyField(analysis: GameAnalysis): HTMLElement {
    */
   if (analysis.enactedFascistCount >= VETO_THRESHOLD) {
     buttons.push(element('button', {
+      disabled: isLocked,
       onClick: () => {
         const wasImplied = getImpliedDiscard(state.draft.presidentClaim, state.draft.enacted) !== undefined;
 
@@ -2116,7 +2148,9 @@ function renderPolicyField(analysis: GameAnalysis): HTMLElement {
       },
       pressed: state.draft.isVetoed === true,
       text: 'Vetoed',
-      title: 'both laws discarded, nothing enacted, and the tracker advances'
+      title: isLocked
+        ? 'ask the Chancellor whether he is Hitler first'
+        : 'both laws discarded, nothing enacted, and the tracker advances'
     }));
   }
 
