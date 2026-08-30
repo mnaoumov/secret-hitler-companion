@@ -230,6 +230,20 @@ interface RoundFacts {
   readonly enactedFascistCount: number;
   readonly enactedLiberalCount: number;
   /**
+   * Who the President named Fascist party, when he named anyone.
+   *
+   * A standing dispute, because no Fascist admits it: the accused denies it, and one of the two is
+   * lying. What that proves is the stronger half — a Liberal does not accuse falsely, so if the
+   * report is untrue the man who made it is Fascist himself. Either way one of the pair is Fascist
+   * party, and the pairs compose: with only three or four such cards in the game, two disjoint
+   * pairs go a long way.
+   *
+   * Rests on the same "a Liberal never lies" convention as the government posterior, and on nothing
+   * about the shuffle — this is a reading of what was said out loud.
+   */
+  readonly investigationDispute: string | undefined;
+
+  /**
    * What the record proves about who lied. Names a seat when the enacted policy refutes that seat's
    * own claim; falls back to "one of them" only when neither claim is refuted on its own.
    */
@@ -600,6 +614,9 @@ function runFilter(game: Game, discardModel: DiscardModel): FilterStep[] {
       electionTracker,
       enactedFascistCount,
       enactedLiberalCount,
+      investigationDispute: round.investigation?.reported === Policy.Fascist
+        ? round.investigation.targetId
+        : undefined,
       lies: findLies({
         chancellorFascistCount: round.chancellorClaim,
         enacted: round.enacted,

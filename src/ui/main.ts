@@ -1048,17 +1048,28 @@ function getReadoutView(committedAnalysis: GameAnalysis): ReadoutView | undefine
   };
 }
 
-function getRoundMark(isFlagged: boolean, isImpossibleTogether: boolean, isWeird: boolean): RoundMark | undefined {
-  // A proved lie names the round it is about, so it outranks a statement about a whole stretch.
+/*
+ * All three at once, if all three are true. They answer different questions — is this round
+ * contradicted, does this stretch add up, would anyone play it this way — and a round can fail more
+ * than one of them. Ranking them hid a real finding behind an unrelated one: a proved lie used to
+ * suppress the WEIRD mark on the same card.
+ */
+function getRoundMarks(isFlagged: boolean, isImpossibleTogether: boolean, isWeird: boolean): RoundMark[] {
+  const marks: RoundMark[] = [];
+
   if (isFlagged) {
-    return { key: 'conflict', label: 'conflict' };
+    marks.push({ key: 'conflict', label: 'conflict' });
   }
 
   if (isImpossibleTogether) {
-    return { key: 'impossible', label: 'not all true' };
+    marks.push({ key: 'impossible', label: 'not all true' });
   }
 
-  return isWeird ? { key: 'weird', label: 'weird' } : undefined;
+  if (isWeird) {
+    marks.push({ key: 'weird', label: 'weird' });
+  }
+
+  return marks;
 }
 
 function getSeatLetter(round: Round, playerId: string): string | undefined {
@@ -2066,11 +2077,13 @@ function renderHistory(analysis: GameAnalysis): HTMLElement {
      * (he discarded the Liberal) and FL then F (he enacted the Fascist) are both legal and both never
      * happen in a normal game.
      */
-    const isFlagged = (roundAnalysis?.lies.length ?? 0) > 0 || roundAnalysis?.peekContradiction === true;
+    const isFlagged = (roundAnalysis?.lies.length ?? 0) > 0
+      || roundAnalysis?.peekContradiction === true
+      || roundAnalysis?.investigationDispute !== undefined;
     const isImpossibleTogether = impossibleIndices.has(index);
     const isWeird = (roundAnalysis?.unusualPlays.length ?? 0) > 0;
     const isSelected = state.selectedRoundIndex === index;
-    const mark = getRoundMark(isFlagged, isImpossibleTogether, isWeird);
+    const marks = getRoundMarks(isFlagged, isImpossibleTogether, isWeird);
 
     /*
      * Only the summary selects the round. The pins sit outside it, so tapping "trust" changes the
@@ -2094,7 +2107,7 @@ function renderHistory(analysis: GameAnalysis): HTMLElement {
       renderHistorySeats(round),
       element('div', { className: 'history__claims' }, [
         ...renderClaims(round),
-        ...(mark === undefined ? [] : [element('span', { className: `mark mark--${mark.key}`, text: mark.label })])
+        ...marks.map((mark) => element('span', { className: `mark mark--${mark.key}`, text: mark.label }))
       ]),
       ...renderHistoryVotes(round),
       ...renderHistoryPower(round)
@@ -2413,6 +2426,36 @@ function renderInvestigation(deadIds: ReadonlySet<string>, isLocked: boolean): H
  * could not have produced it is refuted outright — that is a proof about one player, and saying
  * "one of these two" instead would throw the proof away.
  */
+/*
+ * An accusation is a dispute the moment it is made, because no Fascist agrees to being named one.
+ * So the pair contradict each other without the denial having to be recorded.
+ *
+ * What is written here is the stronger reading rather than "one of them is lying", which would be
+ * true and nearly useless. A Liberal does not accuse falsely, so a false report makes its author
+ * Fascist — meaning one of the two holds a Fascist card either way. Those pairs narrow a set of
+ * three or four.
+ */
+function renderInvestigationDispute(view: ReadoutView): HTMLElement[] {
+  const targetId = view.analysis.investigationDispute;
+
+  if (targetId === undefined) {
+    return [];
+  }
+
+  return [element('p', { className: 'alert' }, [
+    element('strong', { className: 'is-fascist', text: 'One of them is Fascist party' }),
+    element(
+      'span',
+      {},
+      renderPhrase(
+        ` — the President says ${nameOf(targetId)} is, and ${nameOf(targetId)} will have denied it.`
+          + ' If the report is untrue then the President is Fascist himself, because a Liberal would not'
+          + ' make it.'
+      )
+    )
+  ])];
+}
+
 function renderLies(view: ReadoutView): HTMLElement[] {
   return view.analysis.lies.map((lie) => {
     const subject = getLieSubject(lie.actor, view);
@@ -3030,7 +3073,7 @@ function renderReadout(view: ReadoutView | undefined): HTMLElement {
     return panel;
   }
 
-  panel.append(...renderLies(view));
+  panel.append(...renderLies(view), ...renderInvestigationDispute(view));
 
   if (!view.analysis.shuffle.isPossible) {
     panel.append(element('p', { className: 'alert', text: 'This record is impossible against the deck.' }));
