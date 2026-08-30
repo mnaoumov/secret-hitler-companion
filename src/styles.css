@@ -980,14 +980,12 @@ button.is-claimed[aria-pressed='true'] {
 }
 
 /*
- * Set apart from the answers beside it. It is the same kind of thing — a recorded answer — but it is
- * the one nobody hopes to tap, and at full weight it competed with the hands for the eye.
+ * Set apart from the answers beside it by colour alone. It is the one nobody hopes to tap, but it is
+ * an answer like the others and sits in their row, so shrinking it left a short button in a line of
+ * tall ones. Colour separates it without breaking the row.
  */
 .refusal {
-  font-size: 0.8em;
-  min-height: 1.8em;
-  opacity: 0.8;
-  padding: 0.15em 0.6em;
+  color: var(--muted);
 }
 
 /* Named as well as coloured, so the difference survives a colour-blind reader and a dim projector. */

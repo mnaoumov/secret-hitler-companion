@@ -1179,9 +1179,14 @@ function renderChancellorClaimField(): HTMLElement {
   return element('div', { className: 'field field--optional' }, [
     element('span', { className: 'field__label is-chancellor', text: 'Chancellor claims received laws' }),
     ...buttons,
-    renderRefusal('chancellorClaim', () => {
-      state.draft.chancellorClaim = undefined;
-    }),
+    renderRefusal(
+      'chancellorClaim',
+      () => {
+        state.draft.chancellorClaim = undefined;
+      },
+      false,
+      isLocked
+    ),
     ...renderChancellorDiscard()
   ]);
 }
@@ -1589,8 +1594,8 @@ function renderEntry(analysis: GameAnalysis): HTMLElement {
  * If the executed player is Hitler he must reveal himself, and the game ends there. That makes this
  * answer a fact rather than a claim, which is why it ends the game outright.
  */
-function renderExecution(deadIds: ReadonlySet<string>): HTMLElement[] {
-  const fields = [renderPowerTarget('Execute', 'executionTargetId', deadIds)];
+function renderExecution(deadIds: ReadonlySet<string>, isLocked: boolean): HTMLElement[] {
+  const fields = [renderPowerTarget('Execute', 'executionTargetId', deadIds, isLocked)];
 
   if (state.draft.executionTargetId === undefined) {
     return fields;
@@ -1956,7 +1961,7 @@ function renderIneligibilityNotes(ineligible: ReadonlyMap<string, Ineligibility>
  * The President sees a Party Membership card and may then say anything he likes about it, so both
  * the target and what he reported are recorded — the report as a claim, not as a fact.
  */
-function renderInvestigation(deadIds: ReadonlySet<string>): HTMLElement[] {
+function renderInvestigation(deadIds: ReadonlySet<string>, isLocked: boolean): HTMLElement[] {
   /*
    * A Party Membership card, which is not a law and not quite a role either: Hitler's party card
    * reads Fascist, so an investigation that comes back Fascist has not distinguished him from an
@@ -1968,7 +1973,7 @@ function renderInvestigation(deadIds: ReadonlySet<string>): HTMLElement[] {
   ];
 
   return [
-    renderPowerTarget('Investigate', 'investigationTargetId', deadIds),
+    renderPowerTarget('Investigate', 'investigationTargetId', deadIds, isLocked),
     element('div', { className: 'field field--power' }, [
       /*
        * The label carries the whole sentence and the buttons finish it, so what is being recorded is
@@ -1982,7 +1987,7 @@ function renderInvestigation(deadIds: ReadonlySet<string>): HTMLElement[] {
       ...reports.map((report) =>
         element('button', {
           className: report.policy === Policy.Fascist ? 'is-fascist' : 'is-liberal',
-          disabled: state.draft.investigationTargetId === undefined,
+          disabled: isLocked || state.draft.investigationTargetId === undefined,
           onClick: () => {
             state.draft.investigationReported = state.draft.investigationReported === report.policy
               ? undefined
@@ -1995,9 +2000,14 @@ function renderInvestigation(deadIds: ReadonlySet<string>): HTMLElement[] {
           title: state.draft.investigationTargetId === undefined ? 'name who was investigated first' : ''
         })
       ),
-      renderRefusal('investigationReport', () => {
-        state.draft.investigationReported = undefined;
-      })
+      renderRefusal(
+        'investigationReport',
+        () => {
+          state.draft.investigationReported = undefined;
+        },
+        false,
+        isLocked || state.draft.investigationTargetId === undefined
+      )
     ])
   ];
 }
@@ -2144,12 +2154,13 @@ function renderPassClaim(view: ReadoutView): HTMLElement {
   ]);
 }
 
-function renderPeek(): HTMLElement[] {
+function renderPeek(isLocked: boolean): HTMLElement[] {
   const slots = Array.from({ length: DRAW_SIZE }, (_unused, slot) => {
     const value = state.draft.peek[slot];
 
     return element('button', {
       className: getPolicyClassName(value),
+      disabled: isLocked,
       onClick: () => {
         state.draft.peek[slot] = cyclePolicy(value);
         state.draft.refusals.delete('peek');
@@ -2163,9 +2174,14 @@ function renderPeek(): HTMLElement[] {
   return [element('div', { className: 'field field--power' }, [
     element('span', { className: 'field__label', text: 'Peek says' }),
     ...slots,
-    renderRefusal('peek', () => {
-      state.draft.peek = [];
-    })
+    renderRefusal(
+      'peek',
+      () => {
+        state.draft.peek = [];
+      },
+      false,
+      isLocked
+    )
   ])];
 }
 
@@ -2341,15 +2357,18 @@ function renderPower(analysis: GameAnalysis): HTMLElement[] {
   const power = getPowerForFascistPolicy(state.players.length, analysis.enactedFascistCount + 1);
   const deadIds = new Set(analysis.deadPlayerIds);
 
+  // The power is used after the session, so it waits for both seats to have answered for it.
+  const isLocked = describeMissingClaims() !== undefined;
+
   switch (power) {
     case 'execution':
-      return renderExecution(deadIds);
+      return renderExecution(deadIds, isLocked);
     case 'investigateLoyalty':
-      return renderInvestigation(deadIds);
+      return renderInvestigation(deadIds, isLocked);
     case 'policyPeek':
-      return renderPeek();
+      return renderPeek(isLocked);
     case 'specialElection':
-      return [renderPowerTarget('Next President', 'specialElectionTargetId', deadIds)];
+      return [renderPowerTarget('Next President', 'specialElectionTargetId', deadIds, isLocked)];
     default:
       return [];
   }
@@ -2387,15 +2406,16 @@ function renderPowerPlayWarning(analysis: GameAnalysis): HTMLElement[] {
 function renderPowerTarget(
   label: string,
   key: 'executionTargetId' | 'investigationTargetId' | 'specialElectionTargetId',
-  deadIds: ReadonlySet<string>
+  deadIds: ReadonlySet<string>,
+  isLocked: boolean
 ): HTMLElement {
   const ineligible = getPowerTargetIneligibility(deadIds);
 
   const buttons = state.players.map((player, index) => {
-    const reason = ineligible.get(player.id)?.reason;
+    const reason = isLocked ? 'the government answers first' : ineligible.get(player.id)?.reason;
 
     return element('button', {
-      className: reason === undefined ? '' : 'is-ineligible',
+      className: ineligible.has(player.id) ? 'is-ineligible' : '',
       disabled: reason !== undefined,
       onClick: () => {
         state.draft[key] = state.draft[key] === player.id ? undefined : player.id;
@@ -2415,8 +2435,12 @@ function renderPowerTarget(
 }
 
 function renderPresidentClaimField(): HTMLElement {
-  // Nothing can be said about a session until its outcome is known.
-  const isLocked = !isSessionResolved();
+  /*
+   * Nothing can be said about a session until its outcome is known, and the President is not asked
+   * until the Chancellor has answered — the table works down the form in the order it puts the
+   * questions, and asking the Chancellor first is the whole reason the rows are in this order.
+   */
+  const isLocked = !isSessionResolved() || !isAnswered('chancellorClaim', state.draft.chancellorClaim);
 
   const buttons = descendingCounts(DRAW_SIZE).map((fascistCount) =>
     element('button', {
@@ -2431,17 +2455,22 @@ function renderPresidentClaimField(): HTMLElement {
         render();
       },
       pressed: state.draft.presidentClaim === fascistCount,
-      title: isLocked ? 'record the outcome first' : ''
+      title: isLocked ? 'the Chancellor answers first' : ''
     }, renderHand(fascistCount, DRAW_SIZE))
   );
 
   return element('div', { className: 'field field--optional' }, [
     element('span', { className: 'field__label is-president', text: 'President claims received laws' }),
     ...buttons,
-    renderRefusal('presidentClaim', () => {
-      state.draft.presidentClaim = undefined;
-      state.draft.presidentDiscard = undefined;
-    })
+    renderRefusal(
+      'presidentClaim',
+      () => {
+        state.draft.presidentClaim = undefined;
+        state.draft.presidentDiscard = undefined;
+      },
+      false,
+      isLocked
+    )
   ]);
 }
 
@@ -2492,13 +2521,19 @@ function renderPresidentDiscardField(): HTMLElement {
   });
 
   const passed = getClaimedPassFascistCount(claim, state.draft.presidentDiscard);
+  const isImplied = getImpliedDiscard(claim, state.draft.enacted) !== undefined;
 
   return element('div', { className: 'field field--optional' }, [
     element('span', { className: 'field__label is-president', text: 'President claims discarded law' }),
     ...buttons,
-    renderRefusal('presidentDiscard', () => {
-      state.draft.presidentDiscard = undefined;
-    }),
+    renderRefusal(
+      'presidentDiscard',
+      () => {
+        state.draft.presidentDiscard = undefined;
+      },
+      isImplied,
+      isLocked
+    ),
     ...(passed === undefined
       ? []
       : [element('span', { className: 'deck__note' }, [
@@ -2595,11 +2630,23 @@ function renderReadout(view: ReadoutView | undefined): HTMLElement {
  * say" were the same blank and only one of them means the round is over. This is the second answer,
  * and taking it clears whatever was recorded — a refusal and a claim cannot both stand.
  */
-function renderRefusal(question: Refusable, onRefuse: () => void): HTMLElement {
+function renderRefusal(
+  question: Refusable,
+  onRefuse: () => void,
+  isImplied = false,
+  isLocked = false
+): HTMLElement {
   const isRefused = state.draft.refusals.has(question);
 
   return element('button', {
     className: 'refusal',
+
+    /*
+     * Nobody can decline a question their own claim has already answered — a President who says he
+     * drew FFF has said which card he discarded, whatever he does with his mouth next — and nobody
+     * is asked at all until the rows above have been answered.
+     */
+    disabled: isImplied || isLocked,
     onClick: () => {
       if (isRefused) {
         state.draft.refusals.delete(question);
@@ -2611,7 +2658,8 @@ function renderRefusal(question: Refusable, onRefuse: () => void): HTMLElement {
       render();
     },
     pressed: isRefused,
-    text: 'Refused to answer'
+    text: 'Refused to answer',
+    title: isImplied ? 'his claim already answers this' : ''
   });
 }
 
@@ -2951,6 +2999,7 @@ function syncImpliedDiscard(wasImplied: boolean): void {
 
   if (implied !== undefined) {
     state.draft.presidentDiscard = implied;
+    state.draft.refusals.delete('presidentDiscard');
 
     return;
   }
