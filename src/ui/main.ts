@@ -422,7 +422,11 @@ function describeMissingFields(analysis: GameAnalysis): string | undefined {
         : undefined;
     }
 
-    return state.draft.enacted === undefined ? 'Which law was enacted?' : undefined;
+    if (state.draft.enacted === undefined) {
+      return 'Which law was enacted?';
+    }
+
+    return describeMissingPower(analysis);
   }
 
   if (isChaosImminent(analysis) && state.draft.forcedEnactment === undefined) {
@@ -437,6 +441,38 @@ function describeMissingFields(analysis: GameAnalysis): string | undefined {
  * hover on a laptop, a press-and-hold on a tablet. Any reason the seat is unavailable is appended
  * rather than replacing the name, so the tooltip never stops answering "who is this".
  */
+/**
+ * What the presidential power still needs before the round can be filed.
+ *
+ * The rulebook is flat about it — "gameplay cannot continue until the President uses the power" — so
+ * a power that names a player is not finished until one is named. Policy Peek names nobody and
+ * reporting what he saw is his to withhold, so it asks for nothing.
+ *
+ * The execution asks for one thing more. Whether the man was Hitler is knowable either way at that
+ * moment: he must say so if he was, and the game carrying on says he was not. Without it a Liberal
+ * victory can pass unnoticed, which is a wrong answer rather than a missing one.
+ */
+function describeMissingPower(analysis: GameAnalysis): string | undefined {
+  if (state.draft.enacted !== Policy.Fascist) {
+    return undefined;
+  }
+
+  switch (getPowerForFascistPolicy(state.players.length, analysis.enactedFascistCount + 1)) {
+    case 'execution':
+      if (state.draft.executionTargetId === undefined) {
+        return 'Who was executed?';
+      }
+
+      return state.draft.wasExecutedPlayerHitler === undefined ? 'Was he Hitler?' : undefined;
+    case 'investigateLoyalty':
+      return state.draft.investigationTargetId === undefined ? 'Who was investigated?' : undefined;
+    case 'specialElection':
+      return state.draft.specialElectionTargetId === undefined ? 'Who is the next President?' : undefined;
+    default:
+      return undefined;
+  }
+}
+
 function describeSeat(index: number, reason: string | undefined): string {
   const name = getDisplayName(index);
 
@@ -1048,10 +1084,14 @@ function renderBoard(analysis: GameAnalysis): HTMLElement {
 
   return element('header', { className: 'board' }, [
     /*
-     * No title during play. The header carries two tracks, the election tracker and three buttons,
-     * and the name is the one thing there that tells nobody anything — it had been squeezed to a
-     * single letter and an ellipsis. It survives on the setup screen and in the browser tab.
+     * The name, in the corner where a name belongs.
+     *
+     * Small and muted rather than a heading: a screen cast to a television is usually shown without
+     * browser chrome, so this is the only place anyone learns what they are looking at, but it is
+     * not what the table is reading. It yields its width before anything else in the row, so on a
+     * narrow screen it truncates instead of pushing a track onto a second line.
      */
+    element('div', { className: 'board__title', text: 'Secret Hitler Companion' }),
     renderTrack('Liberal laws', analysis.enactedLiberalCount, LIBERAL_TRACK_LENGTH, 'pip--liberal'),
     renderTrack('Fascist laws', analysis.enactedFascistCount, FASCIST_TRACK_LENGTH, 'pip--fascist'),
     renderTrack('Tracker', tracker, ELECTION_TRACKER_LIMIT, 'pip--tracker'),
@@ -2104,18 +2144,9 @@ function renderPlayersBar(analysis: GameAnalysis): HTMLElement[] {
     });
   });
 
-  /*
-   * The app's name, in the slack at the end of the seat row.
-   *
-   * It had nowhere else to be during a game: the header is full, and a screen cast to a television
-   * is usually shown without browser chrome, so the tab title nobody ever sees. Here it costs no
-   * vertical space, and it gives up its room to the chips at ten seats rather than the other way
-   * round.
-   */
   const bar = element('div', { className: 'players' }, [
     element('span', { className: 'track__label', text: 'Players' }),
-    ...chips,
-    element('span', { className: 'players__app-name', text: 'Secret Hitler Companion' })
+    ...chips
   ]);
 
   const inspected = state.inspectedPlayerId;

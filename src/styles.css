@@ -114,9 +114,9 @@ body {
 }
 
 /*
- * The title yields first. It is the one thing in the header that carries no information, so on a
- * narrow screen it shrinks and truncates rather than pushing the tracks and the buttons onto a
- * second line and eating a whole row of a viewport that has none to spare.
+ * The title yields first. It is the one thing in the header that carries no information for the
+ * table, so on a narrow screen it shrinks and truncates rather than pushing the tracks and the
+ * buttons onto a second line and eating a whole row of a viewport that has none to spare.
  */
 .board__title {
   /*
@@ -124,9 +124,9 @@ body {
    * measured at its full text length pushes the buttons onto a second row before anything gets a
    * chance to shrink. At zero it never causes the break and simply grows into what is left over.
    */
+  color: var(--muted);
   flex: 1 1 0;
-  font-size: 1.1em;
-  font-weight: 700;
+  font-size: 0.8em;
   letter-spacing: 0.06em;
   margin-right: auto;
   min-width: 0;
@@ -134,6 +134,14 @@ body {
   text-overflow: ellipsis;
   text-transform: uppercase;
   white-space: nowrap;
+}
+
+/* The setup screen has the room to say it properly, and it is the first thing anyone sees there. */
+.setup .board__title {
+  color: var(--text);
+  flex: 0 0 auto;
+  font-size: 1.3em;
+  font-weight: 700;
 }
 
 .track {
@@ -223,23 +231,6 @@ body {
   flex-wrap: wrap;
   gap: 0.4em;
   padding: 0.4em 0.9em;
-}
-
-/*
- * Pushed to the far end and allowed to shrink away to nothing. It is the least important thing in
- * the row, so it takes whatever is left after the seats and never pushes one onto a second line.
- */
-.players__app-name {
-  color: var(--muted);
-  flex: 0 1 auto;
-  font-size: 0.7em;
-  letter-spacing: 0.06em;
-  margin-left: auto;
-  min-width: 0;
-  overflow: hidden;
-  text-align: right;
-  text-transform: uppercase;
-  white-space: nowrap;
 }
 
 .chip {
