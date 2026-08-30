@@ -1946,8 +1946,11 @@ function renderPeek(): HTMLElement[] {
  * A Policy Peek is a claim like any other and gets scored like one.
  *
  * It looks at the pile *after* this round's three cards are gone, which is why it reads `deckAfter`.
- * Two numbers, because the peek is an ordered look: the exact sequence he reported is a stronger
- * claim than the hand he reported it as, and the gap between the two is the factor `C(3, k)`.
+ *
+ * One number, and it is the ordered one. He sees the top three in sequence and reports them in that
+ * sequence, so the sequence is the claim; how likely the same three cards were in some other order
+ * is not a question anyone at the table is asking. (That figure is the ordered one times `C(3, k)`,
+ * if it is ever wanted again.)
  */
 function renderPeekClaim(view: ReadoutView): HTMLElement[] {
   const peek = view.peek;
@@ -1957,8 +1960,6 @@ function renderPeekClaim(view: ReadoutView): HTMLElement[] {
   }
 
   const fascistCount = peek.filter((policy) => policy === Policy.Fascist).length;
-  const inOrder = getOrderedDrawProbability(view.deckAfter, fascistCount);
-  const inAnyOrder = getDrawDistribution(view.deckAfter)[fascistCount] ?? 0;
 
   return [element('div', { className: 'claim' }, [
     element('div', { className: 'claim__title is-president' }, [
@@ -1967,8 +1968,7 @@ function renderPeekClaim(view: ReadoutView): HTMLElement[] {
     ]),
     element('div', { className: 'field' }, [
       element('span', { className: 'field__label', text: 'this order' }),
-      element('span', { className: 'claim__value', text: formatPercentage(inOrder) }),
-      element('span', { className: 'deck__note', text: `\u00b7 in any order ${formatPercentage(inAnyOrder)}` })
+      element('span', { className: 'claim__value', text: formatPercentage(getOrderedDrawProbability(view.deckAfter, fascistCount)) })
     ])
   ])];
 }
