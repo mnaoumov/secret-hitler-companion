@@ -81,6 +81,9 @@ interface AppState {
    */
   isHistoryOpen: boolean;
 
+  /** Whether "New game" has been tapped once and is waiting to be confirmed. */
+  isNewGameArmed: boolean;
+
   /**
    * Seating and names belong to setup, not to play.
    *
@@ -140,6 +143,16 @@ interface Draft {
   presidentDiscard?: Policy | undefined;
 
   presidentId?: string | undefined;
+
+  /**
+   * The questions a player has been asked and declined to answer.
+   *
+   * Silence and "not yet asked" look the same in the data — both leave the claim undefined — and
+   * only one of them means the round is finished. Recording the refusal separates them, so the
+   * round cannot be filed with a question still hanging, and "he would not say" is itself something
+   * the table saw.
+   */
+  refusals: Set<Refusable>;
   specialElectionTargetId?: string | undefined;
   votes: Record<string, boolean>;
   /** Whether the executed player turned out to be Hitler. The rules force a truthful answer. */
@@ -188,6 +201,9 @@ interface ReadoutView {
   readonly roundNumber: number;
 }
 
+/** A question that may be answered or explicitly declined. */
+type Refusable = 'chancellorClaim' | 'investigationReport' | 'peek' | 'presidentClaim' | 'presidentDiscard';
+
 interface ScrollPosition {
   readonly left: number;
   readonly top: number;
@@ -214,6 +230,7 @@ const state: AppState = {
   inspectedPlayerId: undefined,
   isAnalysisVisible: false,
   isHistoryOpen: false,
+  isNewGameArmed: false,
   phase: 'setup',
   players: createPlayers(MIN_PLAYER_COUNT),
   renamingPlayerId: undefined,
@@ -271,7 +288,7 @@ function commitRound(): void {
  * normal button row, because a Special Election or a miscount has to be correctable in one tap.
  */
 function createDraft(presidentId?: string): Draft {
-  return { peek: [], presidentId, votes: {} };
+  return { peek: [], presidentId, refusals: new Set<Refusable>(), votes: {} };
 }
 
 /*
@@ -386,6 +403,49 @@ function describeImpossiblePass(view: ReadoutView | undefined): string {
   return 'the draw pile cannot supply this';
 }
 
+/*
+ * The buttons carry the seat, not the name, so the name has to be reachable some other way — a
+ * hover on a laptop, a press-and-hold on a tablet. Any reason the seat is unavailable is appended
+ * rather than replacing the name, so the tooltip never stops answering "who is this".
+ */
+/**
+ * What the presidential power still needs before the round can be filed.
+ *
+ * The rulebook is flat about it — "gameplay cannot continue until the President uses the power" — so
+ * a power that names a player is not finished until one is named. Policy Peek names nobody and
+ * reporting what he saw is his to withhold, so it asks for nothing.
+ *
+ * The execution asks for one thing more. Whether the man was Hitler is knowable either way at that
+ * moment: he must say so if he was, and the game carrying on says he was not. Without it a Liberal
+ * victory can pass unnoticed, which is a wrong answer rather than a missing one.
+ */
+/**
+ * Which of the two seats has still to be put on the record.
+ *
+ * Both are asked every round with an outcome. A government is free to say nothing, but the table is
+ * not free to leave the question hanging: "he would not say" is an answer and gets recorded as one.
+ *
+ * The discard follows the hand — a President who would not name what he drew is not then asked what
+ * he threw away, and one whose claim leaves him no choice has had it filled in already.
+ */
+function describeMissingClaims(): string | undefined {
+  if (!isAnswered('chancellorClaim', state.draft.chancellorClaim)) {
+    return 'What does the Chancellor say?';
+  }
+
+  if (!isAnswered('presidentClaim', state.draft.presidentClaim)) {
+    return 'What does the President say?';
+  }
+
+  if (state.draft.presidentClaim === undefined) {
+    return undefined;
+  }
+
+  return isAnswered('presidentDiscard', state.draft.presidentDiscard)
+    ? undefined
+    : 'What does the President say he discarded?';
+}
+
 function describeMissingFields(analysis: GameAnalysis): string | undefined {
   if (state.draft.presidentId === undefined) {
     return 'Pick the President';
@@ -417,16 +477,18 @@ function describeMissingFields(analysis: GameAnalysis): string | undefined {
     }
 
     if (state.draft.isVetoed === true) {
-      return isChaosImminent(analysis) && state.draft.forcedEnactment === undefined
-        ? 'Which law came off the top?'
-        : undefined;
+      if (isChaosImminent(analysis) && state.draft.forcedEnactment === undefined) {
+        return 'Which law came off the top?';
+      }
+
+      return describeMissingClaims();
     }
 
     if (state.draft.enacted === undefined) {
       return 'Which law was enacted?';
     }
 
-    return describeMissingPower(analysis);
+    return describeMissingClaims() ?? describeMissingPower(analysis);
   }
 
   if (isChaosImminent(analysis) && state.draft.forcedEnactment === undefined) {
@@ -436,22 +498,6 @@ function describeMissingFields(analysis: GameAnalysis): string | undefined {
   return undefined;
 }
 
-/*
- * The buttons carry the seat, not the name, so the name has to be reachable some other way — a
- * hover on a laptop, a press-and-hold on a tablet. Any reason the seat is unavailable is appended
- * rather than replacing the name, so the tooltip never stops answering "who is this".
- */
-/**
- * What the presidential power still needs before the round can be filed.
- *
- * The rulebook is flat about it — "gameplay cannot continue until the President uses the power" — so
- * a power that names a player is not finished until one is named. Policy Peek names nobody and
- * reporting what he saw is his to withhold, so it asks for nothing.
- *
- * The execution asks for one thing more. Whether the man was Hitler is knowable either way at that
- * moment: he must say so if he was, and the game carrying on says he was not. Without it a Liberal
- * victory can pass unnoticed, which is a wrong answer rather than a missing one.
- */
 function describeMissingPower(analysis: GameAnalysis): string | undefined {
   if (state.draft.enacted !== Policy.Fascist) {
     return undefined;
@@ -465,7 +511,17 @@ function describeMissingPower(analysis: GameAnalysis): string | undefined {
 
       return state.draft.wasExecutedPlayerHitler === undefined ? 'Was he Hitler?' : undefined;
     case 'investigateLoyalty':
-      return state.draft.investigationTargetId === undefined ? 'Who was investigated?' : undefined;
+      if (state.draft.investigationTargetId === undefined) {
+        return 'Who was investigated?';
+      }
+
+      return isAnswered('investigationReport', state.draft.investigationReported)
+        ? undefined
+        : 'What does the President say the investigation showed?';
+    case 'policyPeek':
+      return isAnswered('peek', state.draft.peek.length === DRAW_SIZE ? state.draft.peek : undefined)
+        ? undefined
+        : 'What does the President say he saw?';
     case 'specialElection':
       return state.draft.specialElectionTargetId === undefined ? 'Who is the next President?' : undefined;
     default:
@@ -848,12 +904,17 @@ function getVoteWord(vote: boolean | undefined): string {
   return vote ? 'ja' : 'nein';
 }
 
+/** Whether a question has been settled either way, which is what the save button waits on. */
+function isAnswered(question: Refusable, value: unknown): boolean {
+  return value !== undefined || state.draft.refusals.has(question);
+}
+
+// ---------- readout ----------
+
 /** `undefined` means no assumption, which is every hand still on the table. */
 function isAssumed(assumed: readonly number[] | undefined, fascistCount: number): boolean {
   return assumed === undefined || assumed.includes(fascistCount);
 }
-
-// ---------- readout ----------
 
 function isChaosImminent(analysis: GameAnalysis): boolean {
   return (analysis.rounds.at(-1)?.electionTracker ?? 0) + 1 >= ELECTION_TRACKER_LIMIT;
@@ -1107,6 +1168,7 @@ function renderChancellorClaimField(): HTMLElement {
       disabled: isLocked,
       onClick: () => {
         state.draft.chancellorClaim = state.draft.chancellorClaim === fascistCount ? undefined : fascistCount;
+        state.draft.refusals.delete('chancellorClaim');
         render();
       },
       pressed: state.draft.chancellorClaim === fascistCount,
@@ -1117,6 +1179,9 @@ function renderChancellorClaimField(): HTMLElement {
   return element('div', { className: 'field field--optional' }, [
     element('span', { className: 'field__label is-chancellor', text: 'Chancellor claims received laws' }),
     ...buttons,
+    renderRefusal('chancellorClaim', () => {
+      state.draft.chancellorClaim = undefined;
+    }),
     ...renderChancellorDiscard()
   ]);
 }
@@ -1797,6 +1862,8 @@ function renderHistoryPower(round: Round): HTMLElement[] {
   return notes.map((note) => element('div', { className: 'history__power', text: note }));
 }
 
+// ---------- history ----------
+
 /** Who governed and what came of it, in the two seat colours. */
 function renderHistorySeats(round: Round): HTMLElement {
   return element('div', { className: 'history__seats' }, [
@@ -1807,8 +1874,6 @@ function renderHistorySeats(round: Round): HTMLElement {
     ...renderRoundOutcomeMark(round)
   ]);
 }
-
-// ---------- history ----------
 
 function renderHistoryVotes(round: Round): HTMLElement[] {
   const votes = round.votes;
@@ -1922,13 +1987,17 @@ function renderInvestigation(deadIds: ReadonlySet<string>): HTMLElement[] {
             state.draft.investigationReported = state.draft.investigationReported === report.policy
               ? undefined
               : report.policy;
+            state.draft.refusals.delete('investigationReport');
             render();
           },
           pressed: state.draft.investigationReported === report.policy,
           text: report.label,
           title: state.draft.investigationTargetId === undefined ? 'name who was investigated first' : ''
         })
-      )
+      ),
+      renderRefusal('investigationReport', () => {
+        state.draft.investigationReported = undefined;
+      })
     ])
   ];
 }
@@ -1979,20 +2048,48 @@ function renderMoveButton(index: number, direction: number): HTMLElement {
   });
 }
 
-function renderNewGame(): HTMLElement {
-  return element('button', {
+/*
+ * Asks first, once there is a game to lose.
+ *
+ * It sits among the buttons people tap all evening and throws away every round recorded so far,
+ * with nothing to undo it. The confirmation is a second button rather than a changed label, so
+ * there is always something to tap that is not destructive.
+ */
+function renderNewGame(): HTMLElement[] {
+  if (state.isNewGameArmed) {
+    return [
+      element('button', {
+        className: 'is-fascist',
+        onClick: () => {
+          startNewGame();
+          render();
+        },
+        pressed: true,
+        text: 'Discard this game'
+      }),
+      element('button', {
+        onClick: () => {
+          state.isNewGameArmed = false;
+          render();
+        },
+        text: 'keep playing'
+      })
+    ];
+  }
+
+  return [element('button', {
     onClick: () => {
-      // Back to setup with the same people; only the game itself is discarded.
-      state.phase = 'setup';
-      state.rounds = [];
-      state.draft = createDraft();
-      state.inspectedPlayerId = undefined;
-      state.renamingPlayerId = undefined;
-      state.selectedRoundIndex = undefined;
+      // Nothing is lost before the first round is filed, so there is nothing to ask about.
+      if (state.rounds.length === 0) {
+        startNewGame();
+      } else {
+        state.isNewGameArmed = true;
+      }
+
       render();
     },
     text: 'New game'
-  });
+  })];
 }
 
 /*
@@ -2055,6 +2152,7 @@ function renderPeek(): HTMLElement[] {
       className: getPolicyClassName(value),
       onClick: () => {
         state.draft.peek[slot] = cyclePolicy(value);
+        state.draft.refusals.delete('peek');
         render();
       },
       pressed: value !== undefined,
@@ -2064,7 +2162,10 @@ function renderPeek(): HTMLElement[] {
 
   return [element('div', { className: 'field field--power' }, [
     element('span', { className: 'field__label', text: 'Peek says' }),
-    ...slots
+    ...slots,
+    renderRefusal('peek', () => {
+      state.draft.peek = [];
+    })
   ])];
 }
 
@@ -2149,9 +2250,9 @@ function renderPlayersBar(analysis: GameAnalysis): HTMLElement[] {
    * the app is actually used at. Down here they take the slack the seats were not using.
    */
   const bar = element('div', { className: 'players' }, [
+    ...renderNewGame(),
     renderAnalysisToggle(),
     ...(state.isAnalysisVisible ? [renderHistoryButton()] : []),
-    renderNewGame(),
     element('span', { className: 'track__label', text: 'Players' }),
     ...chips
   ]);
@@ -2325,6 +2426,7 @@ function renderPresidentClaimField(): HTMLElement {
         const wasImplied = getImpliedDiscard(state.draft.presidentClaim, state.draft.enacted) !== undefined;
 
         state.draft.presidentClaim = state.draft.presidentClaim === fascistCount ? undefined : fascistCount;
+        state.draft.refusals.delete('presidentClaim');
         syncImpliedDiscard(wasImplied);
         render();
       },
@@ -2335,7 +2437,11 @@ function renderPresidentClaimField(): HTMLElement {
 
   return element('div', { className: 'field field--optional' }, [
     element('span', { className: 'field__label is-president', text: 'President claims received laws' }),
-    ...buttons
+    ...buttons,
+    renderRefusal('presidentClaim', () => {
+      state.draft.presidentClaim = undefined;
+      state.draft.presidentDiscard = undefined;
+    })
   ]);
 }
 
@@ -2376,6 +2482,7 @@ function renderPresidentDiscardField(): HTMLElement {
       disabled: isLocked || isMissing || hasNoChoice,
       onClick: () => {
         state.draft.presidentDiscard = state.draft.presidentDiscard === policy ? undefined : policy;
+        state.draft.refusals.delete('presidentDiscard');
         render();
       },
       pressed: state.draft.presidentDiscard === policy,
@@ -2389,6 +2496,9 @@ function renderPresidentDiscardField(): HTMLElement {
   return element('div', { className: 'field field--optional' }, [
     element('span', { className: 'field__label is-president', text: 'President claims discarded law' }),
     ...buttons,
+    renderRefusal('presidentDiscard', () => {
+      state.draft.presidentDiscard = undefined;
+    }),
     ...(passed === undefined
       ? []
       : [element('span', { className: 'deck__note' }, [
@@ -2398,7 +2508,6 @@ function renderPresidentDiscardField(): HTMLElement {
   ]);
 }
 
-/** Read-only: the rotation decides this, so it is reported rather than offered. */
 function renderPresidentField(): HTMLElement {
   return element('div', { className: 'field' }, [
     element('span', { className: 'field__label is-president', text: 'President' }),
@@ -2476,6 +2585,34 @@ function renderReadout(view: ReadoutView | undefined): HTMLElement {
   panel.append(...renderPeekClaim(view));
 
   return panel;
+}
+
+/** Read-only: the rotation decides this, so it is reported rather than offered. */
+/*
+ * The answer a player is always able to give.
+ *
+ * Every question the table puts is now mandatory, because "we have not asked yet" and "he would not
+ * say" were the same blank and only one of them means the round is over. This is the second answer,
+ * and taking it clears whatever was recorded — a refusal and a claim cannot both stand.
+ */
+function renderRefusal(question: Refusable, onRefuse: () => void): HTMLElement {
+  const isRefused = state.draft.refusals.has(question);
+
+  return element('button', {
+    className: 'refusal',
+    onClick: () => {
+      if (isRefused) {
+        state.draft.refusals.delete(question);
+      } else {
+        state.draft.refusals.add(question);
+        onRefuse();
+      }
+
+      render();
+    },
+    pressed: isRefused,
+    text: 'Refused to answer'
+  });
 }
 
 function renderRejectedFields(analysis: GameAnalysis): HTMLElement[] {
@@ -2615,7 +2752,7 @@ function renderTrack(label: string, filled: number, length: number, modifier: st
   const pips = Array.from({ length }, (_unused, index) => element('span', { className: index < filled ? `pip ${modifier}` : 'pip' }));
 
   return element('div', { className: 'track' }, [
-    element('span', { className: 'track__label', text: label }),
+    element('span', { className: 'track__label' }, renderPhrase(label)),
     ...pips
   ]);
 }
@@ -2753,13 +2890,13 @@ function seatLabel(index: number): string {
   return `P${String(index + 1)}`;
 }
 
-// ---------- shared helpers ----------
-
 function seatLabelOf(playerId: string | undefined): string {
   const index = state.players.findIndex((player) => player.id === playerId);
 
   return index === -1 ? '—' : seatLabel(index);
 }
+
+// ---------- shared helpers ----------
 
 function setPlayerCount(count: number): void {
   // Keep the names already typed; only add or drop seats at the end.
@@ -2772,6 +2909,17 @@ function setPlayerCount(count: number): void {
   state.players = [...existing, ...added];
   state.inspectedPlayerId = undefined;
   state.renamingPlayerId = undefined;
+}
+
+/** Back to setup with the same people; only the game itself is discarded. */
+function startNewGame(): void {
+  state.phase = 'setup';
+  state.rounds = [];
+  state.draft = createDraft();
+  state.inspectedPlayerId = undefined;
+  state.isNewGameArmed = false;
+  state.renamingPlayerId = undefined;
+  state.selectedRoundIndex = undefined;
 }
 
 /** Moves the whole player, id included, so nothing recorded against them is orphaned. */

@@ -436,10 +436,6 @@ body {
   width: 1.1em;
 }
 
-.button--wide {
-  flex: 0 0 auto;
-}
-
 /*
  * The outstanding requirement is a label, not a control. Making it look like a button invited taps
  * on something that was never going to do anything.
@@ -572,8 +568,13 @@ button.is-liberal[aria-pressed='true'] {
   color: #fff;
 }
 
+/*
+ * `flex: 0 0 auto`, never `1 1 auto`. The setup screen is a flex COLUMN, so a grow factor there is
+ * vertical: the button stretched to eat every pixel left below the seats. There were two rules for
+ * this class, one of each, and the wrong one came second.
+ */
 .button--wide {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   font-weight: 700;
   letter-spacing: 0.08em;
   margin-top: 0.3em;
@@ -976,6 +977,17 @@ button.is-claimed[aria-pressed='true'] {
 .claim__aside {
   color: var(--muted);
   margin: 0 0.15em;
+}
+
+/*
+ * Set apart from the answers beside it. It is the same kind of thing — a recorded answer — but it is
+ * the one nobody hopes to tap, and at full weight it competed with the hands for the eye.
+ */
+.refusal {
+  font-size: 0.8em;
+  min-height: 1.8em;
+  opacity: 0.8;
+  padding: 0.15em 0.6em;
 }
 
 /* Named as well as coloured, so the difference survives a colour-blind reader and a dim projector. */
