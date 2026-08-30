@@ -2573,7 +2573,8 @@ function renderPresidentDiscardField(): HTMLElement {
 function renderPresidentField(): HTMLElement {
   return element('div', { className: 'field' }, [
     element('span', { className: 'field__label is-president', text: 'President' }),
-    element('span', { className: 'seat is-president', text: nameOf(state.draft.presidentId) })
+    element('span', { className: 'seat is-president', text: nameOf(state.draft.presidentId) }),
+    ...renderSpecialElectionNote()
   ]);
 }
 
@@ -2821,6 +2822,35 @@ function renderSetup(): HTMLElement {
       text: 'Start game'
     })
   ]);
+}
+
+/*
+ * Says so when this Presidency was handed over rather than reached in turn.
+ *
+ * A Special Election is an interruption, not a new starting point: the placard goes back to the
+ * left of the man who gave it away, so the rotation this round appears to break is not actually
+ * broken. Without saying that, the table reads an appointed President as evidence that they have
+ * lost their place — and it is exactly the round where somebody wants to know who is next.
+ */
+function renderSpecialElectionNote(): HTMLElement[] {
+  const previous = state.rounds.at(-1);
+
+  if (previous?.specialElectionTargetId === undefined || previous.specialElectionTargetId !== state.draft.presidentId) {
+    return [];
+  }
+
+  const nextId = analyseGame({
+    players: state.players,
+    rounds: [...state.rounds, getDraftRound()]
+  }).nextPresidentId;
+
+  return [element(
+    'span',
+    { className: 'deck__note' },
+    renderPhrase(
+      `appointed by ${nameOf(previous.presidentId)} with a Special Election — the rotation resumes with ${nameOf(nextId)}`
+    )
+  )];
 }
 
 function renderTrack(label: string, filled: number, length: number, modifier: string): HTMLElement {
