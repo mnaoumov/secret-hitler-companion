@@ -589,6 +589,37 @@ function getForcedDiscard(claim: number | undefined): Policy | undefined {
   return claim === 0 ? Policy.Liberal : undefined;
 }
 
+/**
+ * The discard his claim and the law on the table leave as the only possibility.
+ *
+ * Two ways a choice disappears, and this covers both:
+ *
+ * - His hand had only one colour in it. FFF and LLL leave nothing to decide whatever is on the
+ *   table.
+ * - The board rules the other option out. Claiming FFL under a Liberal law means he cannot have
+ *   discarded the Liberal, because that leaves FF and FF cannot produce a Liberal. FLL under a
+ *   Fascist law is the same shape reversed.
+ *
+ * When the board rules out *everything* his hand allows, his account is already refuted; the hand
+ * constraint alone is used so that the contradiction is stated rather than hidden behind a blank.
+ */
+function getImpliedDiscard(claim: number | undefined, enacted: Policy | undefined): Policy | undefined {
+  if (claim === undefined) {
+    return undefined;
+  }
+
+  const holdable = [Policy.Fascist, Policy.Liberal].filter((policy) => isDiscardPossible(claim, policy));
+  const consistent = holdable.filter((policy) => {
+    const passed = getClaimedPassFascistCount(claim, policy);
+
+    return enacted === undefined || passed === undefined || canEnactFromClaimedPass(passed, enacted);
+  });
+
+  const options = consistent.length > 0 ? consistent : holdable;
+
+  return options.length === 1 ? options[0] : undefined;
+}
+
 function getLieSubject(actor: 'chancellor' | 'president' | 'unknown', view: ReadoutView): string {
   if (actor === 'unknown') {
     return 'One of them is';
@@ -757,11 +788,11 @@ function isAssumed(assumed: readonly number[] | undefined, fascistCount: number)
   return assumed === undefined || assumed.includes(fascistCount);
 }
 
+// ---------- readout ----------
+
 function isChaosImminent(analysis: GameAnalysis): boolean {
   return (analysis.rounds.at(-1)?.electionTracker ?? 0) + 1 >= ELECTION_TRACKER_LIMIT;
 }
-
-// ---------- readout ----------
 
 /** Still carrying the name it was born with, whether that was left alone or typed back in. */
 function isDefaultName(index: number): boolean {
@@ -968,8 +999,8 @@ function renderBoard(analysis: GameAnalysis): HTMLElement {
      * saying less.
      */
     element('div', { className: 'board__title', text: 'Secret Hitler' }),
-    renderTrack('Liberal', analysis.enactedLiberalCount, LIBERAL_TRACK_LENGTH, 'pip--liberal'),
-    renderTrack('Fascist', analysis.enactedFascistCount, FASCIST_TRACK_LENGTH, 'pip--fascist'),
+    renderTrack('Liberal laws', analysis.enactedLiberalCount, LIBERAL_TRACK_LENGTH, 'pip--liberal'),
+    renderTrack('Fascist laws', analysis.enactedFascistCount, FASCIST_TRACK_LENGTH, 'pip--fascist'),
     renderTrack('Tracker', tracker, ELECTION_TRACKER_LIMIT, 'pip--tracker'),
     renderHistoryButton(),
     renderNewGame()
@@ -1222,7 +1253,9 @@ function renderDossierClaims(playerId: string): HTMLElement[] {
     }
 
     const reported = investigation.reported;
-    const said = reported === undefined ? 'said nothing' : `said ${reported === Policy.Fascist ? 'Fascist' : 'Liberal'}`;
+    const said = reported === undefined
+      ? 'said nothing'
+      : `said ${reported === Policy.Fascist ? 'Fascist' : 'Liberal'} party`;
 
     lines.push(element('div', {
       className: 'dossier__claim',
@@ -1313,7 +1346,7 @@ function renderDrawOdds(deck: DeckState): HTMLElement {
     ]),
     element('div', { className: 'legend' }, [
       element('div', {}, [
-        element('strong', {}, renderPhrase('At least one Liberal: ')),
+        element('strong', {}, renderPhrase('At least one Liberal law: ')),
         element('span', { text: formatPercentage(atLeastOneLiberal) })
       ]),
       element('div', {}, [
@@ -1677,7 +1710,9 @@ function renderHistoryPower(round: Round): HTMLElement[] {
 
   if (round.investigation) {
     const reported = round.investigation.reported;
-    const said = reported === undefined ? 'said nothing' : `said ${reported === Policy.Fascist ? 'Fascist' : 'Liberal'}`;
+    const said = reported === undefined
+      ? 'said nothing'
+      : `said ${reported === Policy.Fascist ? 'Fascist' : 'Liberal'} party`;
     notes.push(`investigated ${nameOf(round.investigation.targetId)}, ${said}`);
   }
 
@@ -1734,8 +1769,6 @@ function renderHistoryVotes(round: Round): HTMLElement[] {
   })];
 }
 
-// ---------- history ----------
-
 /*
  * The Hitler check is the one statement the rules force to be truthful, so surviving it is proof
  * rather than testimony. It only means anything inside the zone, so it only appears there.
@@ -1765,6 +1798,8 @@ function renderHitlerCheck(analysis: GameAnalysis): HTMLElement[] {
     )
   ])];
 }
+
+// ---------- history ----------
 
 /*
  * Why a seat is struck through, spelled out rather than hidden in a tooltip.
@@ -1799,15 +1834,20 @@ function renderIneligibilityNotes(ineligible: ReadonlyMap<string, Ineligibility>
  * the target and what he reported are recorded — the report as a claim, not as a fact.
  */
 function renderInvestigation(deadIds: ReadonlySet<string>): HTMLElement[] {
+  /*
+   * A Party Membership card, which is not a law and not quite a role either: Hitler's party card
+   * reads Fascist, so an investigation that comes back Fascist has not distinguished him from an
+   * ordinary Fascist. Saying "party" keeps that from being read as either of the other two.
+   */
   const reports = [
-    { label: 'said Liberal', policy: Policy.Liberal },
-    { label: 'said Fascist', policy: Policy.Fascist }
+    { label: 'said Liberal party', policy: Policy.Liberal },
+    { label: 'said Fascist party', policy: Policy.Fascist }
   ];
 
   return [
     renderPowerTarget('Investigate', 'investigationTargetId', deadIds),
     element('div', { className: 'field field--power' }, [
-      element('span', { className: 'field__label', text: 'Reported' }),
+      element('span', { className: 'field__label', text: 'Reported party' }),
       ...reports.map((report) =>
         element('button', {
           className: report.policy === Policy.Fascist ? 'is-fascist' : 'is-liberal',
@@ -2014,8 +2054,13 @@ function renderPolicyField(analysis: GameAnalysis): HTMLElement {
     element('button', {
       className: policy === Policy.Fascist ? 'is-fascist' : 'is-liberal',
       onClick: () => {
+        const wasImplied = getImpliedDiscard(state.draft.presidentClaim, state.draft.enacted) !== undefined;
+
         state.draft.enacted = state.draft.enacted === policy ? undefined : policy;
         state.draft.isVetoed = undefined;
+
+        // The law on the table is half of what implies the discard, so changing it re-runs the sum.
+        syncImpliedDiscard(wasImplied);
         render();
       },
       pressed: state.draft.enacted === policy && state.draft.isVetoed !== true,
@@ -2031,18 +2076,22 @@ function renderPolicyField(analysis: GameAnalysis): HTMLElement {
   if (analysis.enactedFascistCount >= VETO_THRESHOLD) {
     buttons.push(element('button', {
       onClick: () => {
+        const wasImplied = getImpliedDiscard(state.draft.presidentClaim, state.draft.enacted) !== undefined;
+
         state.draft.isVetoed = state.draft.isVetoed === true ? undefined : true;
 
         if (state.draft.isVetoed === true) {
-          // A veto plays nothing face up, so any policy already tapped is no longer the outcome.
+          // A veto plays nothing face up, so any law already tapped is no longer the outcome.
           state.draft.enacted = undefined;
         }
 
+        // With no law on the table there is nothing to imply the discard from, so it is withdrawn.
+        syncImpliedDiscard(wasImplied);
         render();
       },
       pressed: state.draft.isVetoed === true,
       text: 'Vetoed',
-      title: 'both policies discarded, nothing enacted, and the tracker advances'
+      title: 'both laws discarded, nothing enacted, and the tracker advances'
     }));
   }
 
@@ -2150,31 +2199,10 @@ function renderPresidentClaimField(): HTMLElement {
       className: 'hand',
       disabled: isLocked,
       onClick: () => {
-        const wasForced = getForcedDiscard(state.draft.presidentClaim) !== undefined;
+        const wasImplied = getImpliedDiscard(state.draft.presidentClaim, state.draft.enacted) !== undefined;
 
         state.draft.presidentClaim = state.draft.presidentClaim === fascistCount ? undefined : fascistCount;
-
-        /*
-         * Three of a kind leaves him nothing to decide, so the answer is filled in rather than
-         * asked for.
-         *
-         * The answer is dropped again in two cases: the new hand cannot have supplied the card he
-         * claims he discarded, or the old one had filled it in for him and the new one does not.
-         * That second case matters — correcting a mis-tapped FFF to FFL would otherwise leave the
-         * app asserting a discard nobody had said out loud.
-         */
-        const forced = getForcedDiscard(state.draft.presidentClaim);
-
-        if (forced !== undefined) {
-          state.draft.presidentDiscard = forced;
-        } else if (
-          wasForced
-          || state.draft.presidentClaim === undefined
-          || !isDiscardPossible(state.draft.presidentClaim, state.draft.presidentDiscard)
-        ) {
-          state.draft.presidentDiscard = undefined;
-        }
-
+        syncImpliedDiscard(wasImplied);
         render();
       },
       pressed: state.draft.presidentClaim === fascistCount,
@@ -2320,10 +2348,13 @@ function renderRoundOutcome(round: Round): HTMLElement[] {
     return [element('span', { className: 'deck__note', text: 'nothing recorded' })];
   }
 
-  return [element('span', {
-    className: getPolicyClassName(round.enacted),
-    text: round.enacted === Policy.Fascist ? 'Fascist' : 'Liberal'
-  })];
+  return [
+    element('span', {
+      className: getPolicyClassName(round.enacted),
+      text: round.enacted === Policy.Fascist ? 'Fascist' : 'Liberal'
+    }),
+    element('span', { text: ' law' })
+  ];
 }
 
 /** The outcome as a single glyph, in its policy colour. */
@@ -2547,8 +2578,6 @@ function restoreScrollPositions(root: HTMLElement, positions: ReadonlyMap<string
   }
 }
 
-// ---------- shared helpers ----------
-
 /*
  * In-game buttons always carry the seat, never the name.
  *
@@ -2559,6 +2588,8 @@ function restoreScrollPositions(root: HTMLElement, positions: ReadonlyMap<string
 function seatLabel(index: number): string {
   return `P${String(index + 1)}`;
 }
+
+// ---------- shared helpers ----------
 
 function seatLabelOf(playerId: string | undefined): string {
   const index = state.players.findIndex((player) => player.id === playerId);
@@ -2592,6 +2623,29 @@ function swapPlayers(from: number, to: number): void {
   state.players[to] = first;
   state.inspectedPlayerId = undefined;
   state.renamingPlayerId = undefined;
+}
+
+/**
+ * Fills the discard in wherever it is not a choice, and withdraws one the app supplied once it stops
+ * being implied.
+ *
+ * `wasImplied` says whether the value standing before this edit was the app's rather than the
+ * President's. His own answer survives an edit; the app's does not, because correcting a mis-tapped
+ * hand would otherwise leave a discard nobody said out loud sitting in his row.
+ */
+function syncImpliedDiscard(wasImplied: boolean): void {
+  const claim = state.draft.presidentClaim;
+  const implied = getImpliedDiscard(claim, state.draft.enacted);
+
+  if (implied !== undefined) {
+    state.draft.presidentDiscard = implied;
+
+    return;
+  }
+
+  if (wasImplied || claim === undefined || !isDiscardPossible(claim, state.draft.presidentDiscard)) {
+    state.draft.presidentDiscard = undefined;
+  }
 }
 
 /*

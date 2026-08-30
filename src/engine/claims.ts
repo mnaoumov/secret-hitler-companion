@@ -206,7 +206,7 @@ export function findUnusualPlays(params: FindUnusualPlaysParams): UnusualPlay[] 
   if (presidentFascistCount !== undefined && presidentFascistCount > 0 && presidentDiscard === Policy.Liberal) {
     plays.push({
       actor: 'president',
-      description: 'says he discarded a Liberal while holding a Fascist — a Liberal would not have done it, and a Fascist would have claimed FFF to make the pass look forced'
+      description: 'says he discarded a Liberal law while holding a Fascist one — no Liberal player would do that, and a Fascist player would have claimed FFF to make the pass look forced'
     });
   }
 
@@ -214,7 +214,7 @@ export function findUnusualPlays(params: FindUnusualPlaysParams): UnusualPlay[] 
   if (enacted === Policy.Fascist && chancellorFascistCount === 1) {
     plays.push({
       actor: 'chancellor',
-      description: 'says he enacted a Fascist while holding a Liberal — a Liberal would not have done it, and a Fascist would have claimed FF to make it look forced'
+      description: 'says he enacted a Fascist law while holding a Liberal one — no Liberal player would do that, and a Fascist player would have claimed FF to make it look forced'
     });
   }
 
