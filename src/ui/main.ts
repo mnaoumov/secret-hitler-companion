@@ -35,6 +35,10 @@ import {
   Policy
 } from '../engine/policy.ts';
 import {
+  Allegiance,
+  analyseGovernmentRoles
+} from '../engine/roles.ts';
+import {
   ELECTION_TRACKER_LIMIT,
   FASCIST_TRACK_LENGTH,
   getPowerForFascistPolicy,
@@ -197,6 +201,7 @@ interface ReadoutView {
   readonly peek: readonly Policy[] | undefined;
 
   readonly presidentClaim: number | undefined;
+  readonly presidentDiscard: Policy | undefined;
   readonly presidentId: string | undefined;
   readonly roundNumber: number;
 }
@@ -820,6 +825,7 @@ function getReadoutView(committedAnalysis: GameAnalysis): ReadoutView | undefine
       isRecorded: true,
       peek: round.peek,
       presidentClaim: round.presidentClaim,
+      presidentDiscard: round.presidentDiscard,
       presidentId: round.presidentId,
       roundNumber: selected + 1
     };
@@ -843,6 +849,7 @@ function getReadoutView(committedAnalysis: GameAnalysis): ReadoutView | undefine
     isRecorded: false,
     peek: draftRound.peek,
     presidentClaim: state.draft.presidentClaim,
+    presidentDiscard: state.draft.presidentDiscard,
     presidentId: state.draft.presidentId,
     roundNumber: state.rounds.length + 1
   };
@@ -1695,6 +1702,72 @@ function renderGovernmentLine(round: Round, roundIndex: number, playerId: string
 }
 
 /*
+ * A Policy Peek is a claim like any other and gets scored like one.
+ *
+ * It looks at the pile *after* this round's three cards are gone, which is why it reads `deckAfter`.
+ *
+ * One number, and it is the ordered one. He sees the top three in sequence and reports them in that
+ * sequence, so the sequence is the claim; how likely the same three cards were in some other order
+ * is not a question anyone at the table is asking. (That figure is the ordered one times `C(3, k)`,
+ * if it is ever wanted again.)
+ */
+/*
+ * Which pair of allegiances this government looks like, given what it did and said.
+ *
+ * The model assumes one thing, and only about Liberals: a Liberal never lies, always enacts the
+ * Liberal law when one reaches him, and never hands over a pair that settles the round against his
+ * own side. A Fascist is unconstrained. So the numbers move when a Liberal could NOT have behaved
+ * this way, and barely move otherwise — with nothing claimed they sit near the seating, which is the
+ * honest answer rather than a weak one.
+ */
+function renderGovernmentRoles(view: ReadoutView): HTMLElement[] {
+  if (view.enacted === undefined) {
+    return [];
+  }
+
+  const odds = analyseGovernmentRoles({
+    chancellorClaim: view.chancellorClaim,
+    deck: view.deckBefore,
+    enacted: view.enacted,
+    playerCount: state.players.length,
+    presidentClaim: view.presidentClaim,
+    presidentDiscard: view.presidentDiscard
+  });
+
+  const rows = odds.map((entry) =>
+    element('tr', {}, [
+      element(
+        'td',
+        { className: 'odds__label' },
+        renderPhrase(
+          `${toAllegianceName(entry.president)} President with a ${toAllegianceName(entry.chancellor)} Chancellor`
+        )
+      ),
+      element('td', { text: formatPercentage(entry.probability) })
+    ])
+  );
+
+  return [element('div', { className: 'claim' }, [
+    element('div', { className: 'claim__title', text: 'Who this government looks like' }),
+    element('table', {}, [element('tbody', {}, rows)]),
+
+    /*
+     * Said out loud because the two halves of this table are not equally trustworthy. A dash is a
+     * proof: no Liberal could have acted or spoken that way. The percentages are softer, and they
+     * lean towards a Fascist President for a reason that is about the model rather than about him —
+     * he is allowed to say anything at no cost, so every claim fits him.
+     */
+    element(
+      'span',
+      { className: 'deck__note' },
+      renderPhrase(
+        'A dash is proof; the percentages only lean. A Fascist may say anything, which flatters his rows.'
+      )
+    )
+  ])];
+}
+
+/*
  * A hand, one span per card, so each letter carries its own colour.
  *
  * Built from the count rather than by splitting the formatted string: the same convention as
@@ -1852,6 +1925,8 @@ function renderHistoryButton(): HTMLElement {
   });
 }
 
+// ---------- history ----------
+
 /** What the President did with the power, so the history is a record of actions and not just cards. */
 function renderHistoryPower(round: Round): HTMLElement[] {
   const notes: string[] = [];
@@ -1886,8 +1961,6 @@ function renderHistoryPower(round: Round): HTMLElement[] {
 
   return notes.map((note) => element('div', { className: 'history__power', text: note }));
 }
-
-// ---------- history ----------
 
 /** Who governed and what came of it, in the two seat colours. */
 function renderHistorySeats(round: Round): HTMLElement {
@@ -2289,16 +2362,6 @@ function renderPeek(isLocked: boolean): HTMLElement[] {
   ])];
 }
 
-/*
- * A Policy Peek is a claim like any other and gets scored like one.
- *
- * It looks at the pile *after* this round's three cards are gone, which is why it reads `deckAfter`.
- *
- * One number, and it is the ordered one. He sees the top three in sequence and reports them in that
- * sequence, so the sequence is the claim; how likely the same three cards were in some other order
- * is not a question anyone at the table is asking. (That figure is the ordered one times `C(3, k)`,
- * if it is ever wanted again.)
- */
 function renderPeekClaim(view: ReadoutView): HTMLElement[] {
   const peek = view.peek;
 
@@ -2734,6 +2797,7 @@ function renderReadout(view: ReadoutView | undefined): HTMLElement {
   }
 
   panel.append(...renderPeekClaim(view));
+  panel.append(...renderGovernmentRoles(view));
 
   return panel;
 }
@@ -3089,8 +3153,6 @@ function seatLabelOf(playerId: string | undefined): string {
   return index === -1 ? '—' : seatLabel(index);
 }
 
-// ---------- shared helpers ----------
-
 function setPlayerCount(count: number): void {
   // Keep the names already typed; only add or drop seats at the end.
   const existing = state.players.slice(0, count);
@@ -3103,6 +3165,8 @@ function setPlayerCount(count: number): void {
   state.inspectedPlayerId = undefined;
   state.renamingPlayerId = undefined;
 }
+
+// ---------- shared helpers ----------
 
 /** Back to setup with the same people; only the game itself is discarded. */
 function startNewGame(): void {
@@ -3152,6 +3216,10 @@ function syncImpliedDiscard(wasImplied: boolean): void {
   if (wasImplied || claim === undefined || !isDiscardPossible(claim, state.draft.presidentDiscard)) {
     state.draft.presidentDiscard = undefined;
   }
+}
+
+function toAllegianceName(allegiance: Allegiance): string {
+  return allegiance === Allegiance.Fascist ? 'Fascist' : 'Liberal';
 }
 
 /*
