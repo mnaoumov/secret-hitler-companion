@@ -1272,8 +1272,9 @@ function render(): void {
    */
   const isReviewing = state.selectedRoundIndex !== undefined;
   const outcome = getDraftOutcome();
-  const showReadout = state.isAnalysisVisible
-    && (isReviewing || (!committedAnalysis.victory && (outcome === 'elected' || outcome === 'pending')));
+  const isRoundOnScreen = isReviewing
+    || (!committedAnalysis.victory && (outcome === 'elected' || outcome === 'pending'));
+  const showReadout = state.isAnalysisVisible && isRoundOnScreen;
 
   captureScrollPositions(appRoot);
 
@@ -1290,6 +1291,7 @@ function render(): void {
     ...renderVictory(committedAnalysis),
     element('div', { className: 'main' }, [
       ...(committedAnalysis.victory ? [] : [renderEntry(committedAnalysis)]),
+      ...(isRoundOnScreen ? renderFindings(view) : []),
       ...(showReadout ? [renderReadout(view)] : [])
     ]),
     ...(state.isHistoryOpen ? [renderHistory(committedAnalysis)] : [])
@@ -1304,22 +1306,19 @@ function render(): void {
  */
 function renderAnalysisToggle(): HTMLElement {
   return element('button', {
+    /*
+     * Nothing is closed on the way out any more. The history and the dossiers no longer depend on
+     * this, so shutting them would be taking away something the switch does not own.
+     */
     onClick: () => {
       state.isAnalysisVisible = !state.isAnalysisVisible;
-
-      if (!state.isAnalysisVisible) {
-        state.isHistoryOpen = false;
-        state.inspectedPlayerId = undefined;
-        state.selectedRoundIndex = undefined;
-      }
-
       render();
     },
     pressed: state.isAnalysisVisible,
     text: 'Analysis',
     title: state.isAnalysisVisible
-      ? 'hide the history and the odds again'
-      : 'let the app remember and calculate — everyone sees the same thing'
+      ? 'hide the odds and the pile again'
+      : 'let the app count the deck — everyone sees the same numbers'
   });
 }
 
@@ -1371,6 +1370,14 @@ function renderAssumption(index: number, round: Round): HTMLElement {
  * narrow a hand that was never dealt.
  */
 function renderAssumptionRow(index: number, round: Round, isSettled: boolean): HTMLElement[] {
+  /*
+   * The toggles move pile arithmetic and nothing else, so with the numbers hidden they would be
+   * controls with no visible effect. They come back with the switch.
+   */
+  if (!state.isAnalysisVisible) {
+    return [];
+  }
+
   if (!round.wasElected || (round.enacted === undefined && round.isVetoed !== true)) {
     return [];
   }
@@ -1380,6 +1387,17 @@ function renderAssumptionRow(index: number, round: Round, isSettled: boolean): H
       ? element('div', { className: 'history__assume-label', text: 'settled' })
       : renderAssumption(index, round)
   ];
+}
+
+function renderBackToCurrent(): HTMLElement {
+  return element('button', {
+    className: 'pin',
+    onClick: () => {
+      state.selectedRoundIndex = undefined;
+      render();
+    },
+    text: 'back to current'
+  });
 }
 
 function renderBoard(analysis: GameAnalysis): HTMLElement {
@@ -1645,23 +1663,21 @@ function renderDossier(playerId: string, analysis: GameAnalysis): HTMLElement {
   }
 
   /*
-   * Above this line are facts a player can see by looking at the table: the Hitler check was
-   * answered out loud, and a dead man is visibly out. Below it is the app's memory of what was said
-   * and done, which is the part the switch governs.
+   * All of it public: which seats he has held, and what has been said about him out loud. This is
+   * the app's memory rather than its arithmetic, and remembering is a job the table can do on paper
+   * — badly, and unevenly, which is the only thing supplying it changes.
    */
-  if (state.isAnalysisVisible) {
-    const governments = state.rounds
-      .map((round, roundIndex) => renderGovernmentLine(round, roundIndex, playerId))
-      .filter((entry): entry is HTMLElement => entry !== undefined);
+  const governments = state.rounds
+    .map((round, roundIndex) => renderGovernmentLine(round, roundIndex, playerId))
+    .filter((entry): entry is HTMLElement => entry !== undefined);
 
-    if (governments.length === 0) {
-      lines.push(element('div', { text: 'No governments yet' }));
-    } else {
-      lines.push(...governments);
-    }
-
-    lines.push(...renderDossierClaims(playerId));
+  if (governments.length === 0) {
+    lines.push(element('div', { text: 'No governments yet' }));
+  } else {
+    lines.push(...governments);
   }
+
+  lines.push(...renderDossierClaims(playerId));
 
   return element('div', { className: 'dossier' }, [
     renderDossierHeader(playerId, index),
@@ -1912,6 +1928,44 @@ function renderExecution(deadIds: ReadonlySet<string>, isLocked: boolean): HTMLE
 }
 
 /*
+ * What was said, read back — and nothing that needs the pile.
+ *
+ * This half stays on screen because it is public: both men spoke in front of everybody, and once
+ * the history shows their two claims side by side the contradiction between them is sitting on the
+ * card. Hiding the finding while showing its evidence would be theatre. Counting an unseen deck is
+ * the part nobody at the table can do unaided, and that is what the switch is for.
+ */
+function renderFindings(view: ReadoutView | undefined): HTMLElement[] {
+  if (view === undefined) {
+    return [];
+  }
+
+  const findings = [
+    ...renderLies(view),
+    ...renderInvestigationDispute(view),
+    ...renderInvestigationEndorsement(view),
+    ...renderUnusualPlays(view.analysis.unusualPlays)
+  ];
+
+  if (findings.length === 0) {
+    return [];
+  }
+
+  const isRecorded = view.isRecorded;
+
+  return [element('section', { className: 'panel panel--findings' }, [
+    element('div', { className: 'field' }, [
+      element('h2', {
+        className: 'panel__heading',
+        text: isRecorded ? `Round ${String(view.roundNumber)} — what was said` : 'What was said'
+      }),
+      ...(isRecorded ? [renderBackToCurrent()] : [])
+    ]),
+    ...findings
+  ])];
+}
+
+/*
  * The card the frustrated populace turns over. Shared by the two ways of getting there: a third
  * rejected government, and a veto that pushes the tracker to the same limit.
  */
@@ -2037,6 +2091,8 @@ function renderHand(fascistCount: number, size: number): HTMLElement[] {
   ).map((policy) => element('span', { className: getPolicyClassName(policy), text: policy }));
 }
 
+// ---------- history ----------
+
 /** The same, for a hand that arrived as text — a token matched inside a sentence. */
 function renderHandText(hand: string): HTMLElement[] {
   return renderHand((hand.match(/F/g) ?? []).length, hand.length);
@@ -2080,7 +2136,11 @@ function renderHistory(analysis: GameAnalysis): HTMLElement {
     const isFlagged = (roundAnalysis?.lies.length ?? 0) > 0
       || roundAnalysis?.peekContradiction === true
       || roundAnalysis?.investigationDispute !== undefined;
-    const isImpossibleTogether = impossibleIndices.has(index);
+    /*
+     * The only mark that needs the pile counted, so it is the only one the switch governs. The
+     * other two are readable off the claims printed on the card beside them.
+     */
+    const isImpossibleTogether = state.isAnalysisVisible && impossibleIndices.has(index);
     const isWeird = (roundAnalysis?.unusualPlays.length ?? 0) > 0;
     const isSelected = state.selectedRoundIndex === index;
     const marks = getRoundMarks(isFlagged, isImpossibleTogether, isWeird);
@@ -2177,8 +2237,6 @@ function renderHistory(analysis: GameAnalysis): HTMLElement {
     ])
   ]);
 }
-
-// ---------- history ----------
 
 function renderHistoryButton(): HTMLElement {
   const count = state.rounds.length;
@@ -2457,6 +2515,35 @@ function renderInvestigationDispute(view: ReadoutView): HTMLElement[] {
           + ' If the report is untrue then the President is Fascist himself, because a Liberal would not'
           + ' make it. Both may be, and then the report is true: a Fascist naming his own buys credit'
           + ' for it. All this rules out is that the two of them are both Liberal.'
+      )
+    )
+  ])];
+}
+
+/*
+ * The other half of an investigation, and the reason every one of them now says something.
+ *
+ * Vouching for a man is not a conflict — he will agree, and nothing is contradicted — but a Liberal
+ * could not have said it falsely, so it chains the pair in one direction. Written as the chain
+ * rather than as "he says the man is Liberal", which is only a restatement of the record.
+ */
+function renderInvestigationEndorsement(view: ReadoutView): HTMLElement[] {
+  const targetId = view.analysis.investigationEndorsement;
+
+  if (targetId === undefined) {
+    return [];
+  }
+
+  return [element('p', { className: 'link' }, [
+    element('strong', { className: 'is-liberal', text: 'They stand or fall together' }),
+    element(
+      'span',
+      {},
+      renderPhrase(
+        ` — the President vouches for ${nameOf(targetId)}, and a Liberal would not do that falsely.`
+          + ` So if the President is Liberal then ${nameOf(targetId)} is, and proving ${nameOf(targetId)}`
+          + ' Fascist party proves the President one too. What cannot be is a Liberal President and a'
+          + ` Fascist ${nameOf(targetId)}.`
       )
     )
   ])];
@@ -2750,7 +2837,7 @@ function renderPlayersBar(analysis: GameAnalysis): HTMLElement[] {
   const bar = element('div', { className: 'players' }, [
     ...renderNewGame(),
     renderAnalysisToggle(),
-    ...(state.isAnalysisVisible ? [renderHistoryButton()] : []),
+    renderHistoryButton(),
     element('span', { className: 'track__label', text: 'Players' }),
     ...chips
   ]);
@@ -3030,17 +3117,8 @@ function renderPresidentField(): HTMLElement {
 
 function renderReadout(view: ReadoutView | undefined): HTMLElement {
   const isRecorded = view?.isRecorded === true;
-  const heading = view && isRecorded ? `Round ${String(view.roundNumber)} — recorded` : 'What the shuffle says';
-  const backButton = isRecorded
-    ? [element('button', {
-      className: 'pin',
-      onClick: () => {
-        state.selectedRoundIndex = undefined;
-        render();
-      },
-      text: 'back to current'
-    })]
-    : [];
+  const heading = view && isRecorded ? `Round ${String(view.roundNumber)} — the shuffle` : 'What the shuffle says';
+  const backButton = isRecorded ? [renderBackToCurrent()] : [];
 
   const deck = view?.deckBefore ?? { fascistCountProbabilities: [], size: 0 };
   const panel = element('section', { className: 'panel panel--readout' }, [
@@ -3079,13 +3157,10 @@ function renderReadout(view: ReadoutView | undefined): HTMLElement {
     return panel;
   }
 
-  panel.append(...renderLies(view), ...renderInvestigationDispute(view));
-
+  // The findings moved out to their own panel; what is left below all reads off the pile.
   if (!view.analysis.shuffle.isPossible) {
     panel.append(element('p', { className: 'alert', text: 'This record is impossible against the deck.' }));
   }
-
-  panel.append(...renderUnusualPlays(view.analysis.unusualPlays));
 
   if (view.presidentClaim !== undefined) {
     panel.append(renderDrawTable(view));

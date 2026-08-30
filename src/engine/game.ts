@@ -247,6 +247,19 @@ interface RoundFacts {
   readonly investigationDispute: string | undefined;
 
   /**
+   * Who the President vouched for, when he reported anyone Liberal party.
+   *
+   * The mirror of the accusation, and it carries information too — a report nobody disputes is
+   * still a statement a Liberal could not have made falsely. So the President being Liberal makes
+   * the man he named Liberal, and the two are chained one way: what condemns the named man
+   * condemns the man who vouched for him.
+   *
+   * Not a conflict. Nothing here contradicts anything, which is why it is kept apart from the
+   * lies — but every investigation now says something, rather than only the hostile ones.
+   */
+  readonly investigationEndorsement: string | undefined;
+
+  /**
    * What the record proves about who lied. Names a seat when the enacted policy refutes that seat's
    * own claim; falls back to "one of them" only when neither claim is refuted on its own.
    */
@@ -618,6 +631,9 @@ function runFilter(game: Game, discardModel: DiscardModel): FilterStep[] {
       enactedFascistCount,
       enactedLiberalCount,
       investigationDispute: round.investigation?.reported === Policy.Fascist
+        ? round.investigation.targetId
+        : undefined,
+      investigationEndorsement: round.investigation?.reported === Policy.Liberal
         ? round.investigation.targetId
         : undefined,
       lies: findLies({

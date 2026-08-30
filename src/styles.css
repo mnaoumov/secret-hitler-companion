@@ -411,8 +411,21 @@ body {
   padding: 0.7em 0.9em;
 }
 
-.panel--readout {
+.panel--readout,
+.panel--findings {
   overflow: visible;
+}
+
+/*
+ * A link between two players rather than a fault in the record, so it takes the Liberal blue and an
+ * `.alert`'s shape without its alarm. Nothing here is wrong; something here is merely known.
+ */
+.link {
+  border-left: 4px solid var(--liberal);
+  color: var(--liberal);
+  font-size: 0.85em;
+  margin-bottom: 0.4em;
+  padding: 0.2em 0.6em;
 }
 
 .panel--entry {
