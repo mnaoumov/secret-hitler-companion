@@ -22,7 +22,8 @@ import {
   getDrawDistribution,
   getExactFascistCount,
   getOrderedDrawProbability,
-  getTopCardFascistProbability
+  getTopCardFascistProbability,
+  isDeckPossible
 } from '../engine/deck.ts';
 import {
   analyseGame,
@@ -215,7 +216,18 @@ interface ScrollPosition {
 }
 
 /** Regions that scroll independently and must survive a rebuild with their position intact. */
-const SCROLLABLE_SELECTORS = ['.main', '.history'];
+const SCROLLABLE_SELECTORS = ['.main', '.history', '.history__cards'];
+
+/*
+ * Remembered across renders, not merely across one rebuild.
+ *
+ * The history is a strip of cards that scrolls sideways, and it is destroyed every time it closes.
+ * Capturing only what is on screen means a position is forgotten the moment the overlay shuts —
+ * reopen it after picking a round and you are back at the first round, in a game that has thirty.
+ * Keeping the last known offset per region means a region that is absent for a while comes back
+ * where it was left.
+ */
+const scrollPositions = new Map<string, ScrollPosition>();
 
 /*
  * The words and tokens that carry a colour, captured so `split` keeps them as their own pieces.
@@ -262,18 +274,14 @@ function canProduceEnacted(drawFascistCount: number, enacted: Policy): boolean {
  * a fresh element scrolls back to the top. Without this, tapping a vote near the bottom of the
  * fields column threw the row you were tapping off the screen.
  */
-function captureScrollPositions(root: HTMLElement): Map<string, ScrollPosition> {
-  const positions = new Map<string, ScrollPosition>();
-
+function captureScrollPositions(root: HTMLElement): void {
   for (const selector of SCROLLABLE_SELECTORS) {
     const node = root.querySelector(selector);
 
     if (node instanceof HTMLElement && (node.scrollTop > 0 || node.scrollLeft > 0)) {
-      positions.set(selector, { left: node.scrollLeft, top: node.scrollTop });
+      scrollPositions.set(selector, { left: node.scrollLeft, top: node.scrollTop });
     }
   }
-
-  return positions;
 }
 
 function closeHistory(): void {
@@ -1034,11 +1042,11 @@ function render(): void {
   }
 
   if (state.phase === 'setup') {
-    const scrollPositions = captureScrollPositions(appRoot);
+    captureScrollPositions(appRoot);
 
     clear(appRoot);
     appRoot.append(renderSetup());
-    restoreScrollPositions(appRoot, scrollPositions);
+    restoreScrollPositions(appRoot);
 
     return;
   }
@@ -1065,13 +1073,18 @@ function render(): void {
   const showReadout = state.isAnalysisVisible
     && (isReviewing || (!committedAnalysis.victory && (outcome === 'elected' || outcome === 'pending')));
 
-  const scrollPositions = captureScrollPositions(appRoot);
+  captureScrollPositions(appRoot);
 
   clear(appRoot);
   appRoot.append(
     renderBoard(committedAnalysis),
     ...renderPlayersBar(committedAnalysis),
-    ...renderImpossibleHitler(committedAnalysis),
+    /*
+     * Reads the round being entered, not just the filed ones. The contradiction is complete the
+     * moment the last man answers, and waiting for the legislation to be typed in would report it
+     * after the table has already moved on to a session that cannot happen.
+     */
+    ...renderImpossibleHitler(analyseGame({ players: state.players, rounds: [...state.rounds, getDraftRound()] })),
     ...renderVictory(committedAnalysis),
     element('div', { className: 'main' }, [
       ...(committedAnalysis.victory ? [] : [renderEntry(committedAnalysis)]),
@@ -1080,7 +1093,7 @@ function render(): void {
     ...(state.isHistoryOpen ? [renderHistory(committedAnalysis)] : [])
   );
 
-  restoreScrollPositions(appRoot, scrollPositions);
+  restoreScrollPositions(appRoot);
 }
 
 /*
@@ -1368,6 +1381,23 @@ function renderComposition(fascistCount: number, liberalCount: number): HTMLElem
 }
 
 function renderDeck(deck: DeckState): HTMLElement {
+  /*
+   * Say it here, where the pile is described, because everything below reads off this and would
+   * otherwise print confident numbers derived from no pile at all.
+   */
+  if (!isDeckPossible(deck)) {
+    return element('div', { className: 'deck' }, [
+      element('span', { className: 'deck__count', text: `${String(deck.size)} cards` }),
+      element(
+        'span',
+        { className: 'alert' },
+        renderPhrase(
+          'no composition of the pile fits the record — an earlier round cannot be true as it stands'
+        )
+      )
+    ]);
+  }
+
   const exact = getExactFascistCount(deck);
 
   if (exact !== null) {
@@ -1721,7 +1751,7 @@ function renderGovernmentLine(round: Round, roundIndex: number, playerId: string
  * honest answer rather than a weak one.
  */
 function renderGovernmentRoles(view: ReadoutView): HTMLElement[] {
-  if (view.enacted === undefined) {
+  if (view.enacted === undefined || !isDeckPossible(view.deckBefore)) {
     return [];
   }
 
@@ -2246,6 +2276,12 @@ function renderNewGame(): HTMLElement[] {
  */
 function renderOdds(): HTMLElement[] {
   const deck = analyseGame({ players: state.players, rounds: state.rounds }).deckAfter;
+
+  // Nothing to draw from, so nothing to say. The pile above has already said why.
+  if (!isDeckPossible(deck)) {
+    return [];
+  }
+
   const distribution = getDrawDistribution(deck);
 
   /*
@@ -3125,8 +3161,8 @@ function renderVotesField(): HTMLElement {
   ]);
 }
 
-function restoreScrollPositions(root: HTMLElement, positions: ReadonlyMap<string, ScrollPosition>): void {
-  for (const [selector, position] of positions) {
+function restoreScrollPositions(root: HTMLElement): void {
+  for (const [selector, position] of scrollPositions) {
     const node = root.querySelector(selector);
 
     if (node instanceof HTMLElement) {

@@ -127,6 +127,17 @@ export function getTopCardFascistProbability(deck: DeckState): number {
 }
 
 /**
+ * Whether any composition of the pile is still consistent with the record.
+ *
+ * A session that no world survives returns an empty distribution, and every number taken from it
+ * afterwards is arithmetic over nothing — a draw distribution of all zeros, which reads as "a
+ * Fascist law is certain" if it is printed rather than checked.
+ */
+export function isDeckPossible(deck: DeckState): boolean {
+  return deck.fascistCountProbabilities.some((probability) => probability > 0);
+}
+
+/**
  * Remove the top card after it has been revealed, as the election tracker does on a third failed
  * election.
  *
