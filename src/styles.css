@@ -233,7 +233,13 @@ body {
   padding: 0.4em 0.9em;
 }
 
-.chip {
+/*
+ * The controls that share this row are sized like the seats rather than like header buttons. They
+ * are chrome, tapped a few times a game, and at full size the three of them pushed the seats onto a
+ * second line at seven — which costs more than the header ever saved.
+ */
+.chip,
+.players > button {
   font-size: 0.9em;
   min-height: 1.8em;
   padding: 0.15em 0.6em;

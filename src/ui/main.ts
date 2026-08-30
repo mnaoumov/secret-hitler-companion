@@ -1094,10 +1094,7 @@ function renderBoard(analysis: GameAnalysis): HTMLElement {
     element('div', { className: 'board__title', text: 'Secret Hitler Companion' }),
     renderTrack('Liberal laws', analysis.enactedLiberalCount, LIBERAL_TRACK_LENGTH, 'pip--liberal'),
     renderTrack('Fascist laws', analysis.enactedFascistCount, FASCIST_TRACK_LENGTH, 'pip--fascist'),
-    renderTrack('Tracker', tracker, ELECTION_TRACKER_LIMIT, 'pip--tracker'),
-    renderAnalysisToggle(),
-    ...(state.isAnalysisVisible ? [renderHistoryButton()] : []),
-    renderNewGame()
+    renderTrack('Tracker', tracker, ELECTION_TRACKER_LIMIT, 'pip--tracker')
   ]);
 }
 
@@ -2144,7 +2141,17 @@ function renderPlayersBar(analysis: GameAnalysis): HTMLElement[] {
     });
   });
 
+  /*
+   * The controls sit at the head of the seat row rather than in the header above it.
+   *
+   * The header carries the board — two tracks and the election tracker — and the name of the thing
+   * anyone is looking at, and three buttons on top of that left the name truncated at every width
+   * the app is actually used at. Down here they take the slack the seats were not using.
+   */
   const bar = element('div', { className: 'players' }, [
+    renderAnalysisToggle(),
+    ...(state.isAnalysisVisible ? [renderHistoryButton()] : []),
+    renderNewGame(),
     element('span', { className: 'track__label', text: 'Players' }),
     ...chips
   ]);
