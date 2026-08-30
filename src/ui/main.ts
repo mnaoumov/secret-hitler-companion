@@ -2155,19 +2155,31 @@ function renderPassClaim(view: ReadoutView): HTMLElement {
 }
 
 function renderPeek(isLocked: boolean): HTMLElement[] {
+  /*
+   * An empty slot shows the same dot a seat that has not voted does, not a question mark.
+   *
+   * A `?` read as an answer — "he would not say what this card was" — which is the job of the
+   * refusal button beside it, and the row then offered two ways to say the same thing. The dot is
+   * the mark this app already uses for nothing-recorded-here, so it says only that.
+   *
+   * The slots go dead once he has refused: the question is answered, and three live buttons under
+   * an answered question invite a tap that would contradict it.
+   */
+  const isRefused = state.draft.refusals.has('peek');
+
   const slots = Array.from({ length: DRAW_SIZE }, (_unused, slot) => {
     const value = state.draft.peek[slot];
 
     return element('button', {
       className: getPolicyClassName(value),
-      disabled: isLocked,
+      disabled: isLocked || isRefused,
       onClick: () => {
         state.draft.peek[slot] = cyclePolicy(value);
         state.draft.refusals.delete('peek');
         render();
       },
       pressed: value !== undefined,
-      text: value ?? '?'
+      text: value ?? '·'
     });
   });
 
