@@ -2432,8 +2432,13 @@ function renderInvestigation(deadIds: ReadonlySet<string>, isLocked: boolean): H
  *
  * What is written here is the stronger reading rather than "one of them is lying", which would be
  * true and nearly useless. A Liberal does not accuse falsely, so a false report makes its author
- * Fascist — meaning one of the two holds a Fascist card either way. Those pairs narrow a set of
- * three or four.
+ * Fascist — meaning at least one of the two holds a Fascist card. Those pairs narrow a set of three
+ * or four.
+ *
+ * At LEAST one, and the wording has to carry that weight: both being Fascist is consistent and is a
+ * real play, since the report is then true and the accuser is paid in credibility for making it.
+ * Reading the pair as exactly one would have a player clear the other man on finding the first, and
+ * the only thing actually ruled out is that both are Liberal.
  */
 function renderInvestigationDispute(view: ReadoutView): HTMLElement[] {
   const targetId = view.analysis.investigationDispute;
@@ -2443,14 +2448,15 @@ function renderInvestigationDispute(view: ReadoutView): HTMLElement[] {
   }
 
   return [element('p', { className: 'alert' }, [
-    element('strong', { className: 'is-fascist', text: 'One of them is Fascist party' }),
+    element('strong', { className: 'is-fascist', text: 'At least one of them is Fascist party' }),
     element(
       'span',
       {},
       renderPhrase(
         ` — the President says ${nameOf(targetId)} is, and ${nameOf(targetId)} will have denied it.`
           + ' If the report is untrue then the President is Fascist himself, because a Liberal would not'
-          + ' make it.'
+          + ' make it. Both may be, and then the report is true: a Fascist naming his own buys credit'
+          + ' for it. All this rules out is that the two of them are both Liberal.'
       )
     )
   ])];

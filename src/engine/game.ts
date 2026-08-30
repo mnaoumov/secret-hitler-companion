@@ -234,9 +234,12 @@ interface RoundFacts {
    *
    * A standing dispute, because no Fascist admits it: the accused denies it, and one of the two is
    * lying. What that proves is the stronger half — a Liberal does not accuse falsely, so if the
-   * report is untrue the man who made it is Fascist himself. Either way one of the pair is Fascist
+   * report is untrue the man who made it is Fascist himself. So at least one of the pair is Fascist
    * party, and the pairs compose: with only three or four such cards in the game, two disjoint
    * pairs go a long way.
+   *
+   * At least, not exactly: both being Fascist is consistent, and it is a play — the report is then
+   * true and the accuser is paid in credibility for naming his own. Only both-Liberal is excluded.
    *
    * Rests on the same "a Liberal never lies" convention as the government posterior, and on nothing
    * about the shuffle — this is a reading of what was said out loud.
