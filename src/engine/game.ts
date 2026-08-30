@@ -361,6 +361,23 @@ export function analyseGame(game: Game): GameAnalysis {
   };
 }
 
+/**
+ * The seat the placard reaches next by rotation alone.
+ *
+ * Not the same question as who is President next, which a Special Election overrides for one round.
+ * This is "whose turn is it" — and because an appointee never becomes the anchor, it is also who
+ * takes the seat *after* an appointee. Both are what a power play is measured against.
+ */
+export function getRotationSuccessorId(game: Game, deadPlayerIds: readonly string[]): string | undefined {
+  const anchorId = getRotationAnchorId(game);
+
+  if (anchorId === undefined) {
+    return undefined;
+  }
+
+  return getSuccessorId({ afterPlayerId: anchorId, deadPlayerIds, players: game.players });
+}
+
 /** The next living seat clockwise. Exported so the interface can look one seat ahead too. */
 export function getSuccessorId(params: GetSuccessorIdParams): string | undefined {
   const { afterPlayerId, deadPlayerIds, players } = params;
@@ -466,13 +483,7 @@ function getNextPresidentId(game: Game, deadPlayerIds: readonly string[]): strin
     return lastRound.specialElectionTargetId;
   }
 
-  const anchorId = getRotationAnchorId(game);
-
-  if (anchorId === undefined) {
-    return living[0]?.id;
-  }
-
-  return getSuccessorId({ afterPlayerId: anchorId, deadPlayerIds, players: game.players });
+  return getRotationSuccessorId(game, deadPlayerIds) ?? living[0]?.id;
 }
 
 /** The most recent President who took the seat by rotation rather than by appointment. */

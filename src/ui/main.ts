@@ -27,7 +27,7 @@ import {
 } from '../engine/deck.ts';
 import {
   analyseGame,
-  getSuccessorId
+  getRotationSuccessorId
 } from '../engine/game.ts';
 import {
   DRAW_SIZE,
@@ -1699,7 +1699,7 @@ function renderEntry(analysis: GameAnalysis): HTMLElement {
     renderPresidentField(),
     renderSeatField('Chancellor', 'chancellorId', getChancellorIneligibility(analysis)),
     renderVotesField(),
-    ...renderPowerPlayWarning(analysis),
+    ...renderPowerPlayWarnings(),
     // Nothing downstream of the vote exists until the vote is in.
     /*
      * In the order the round actually happens. The Hitler question is asked the moment the
@@ -2708,39 +2708,59 @@ function renderPower(analysis: GameAnalysis): HTMLElement[] {
 }
 
 /*
- * A "power play": nominating as Chancellor the very player who is due the Presidency next. It is
- * legal and sometimes deliberate, but it hands one player both seats back to back and burns the
- * rotation, so it is worth saying out loud before the vote rather than after.
+ * A "power play": handing one player two seats back to back. Legal, sometimes deliberate, and it
+ * burns the rotation — so it is worth saying out loud while the table can still react, which for
+ * the nomination means before the vote.
+ *
+ * Measured against the ROTATION, never against the sitting President. He may be an appointee, and
+ * the placard does not resume from him: it resumes from the man who appointed him. Reading the
+ * successor off the President named the seat clockwise of an interruption, which in a Special
+ * Election round is nobody's turn at all.
  */
-function renderPowerPlayWarning(analysis: GameAnalysis): HTMLElement[] {
-  const presidentId = state.draft.presidentId;
+function renderPowerPlayWarnings(): HTMLElement[] {
   const chancellorId = state.draft.chancellorId;
+  const appointeeId = state.draft.specialElectionTargetId;
 
-  if (presidentId === undefined || chancellorId === undefined) {
+  if (state.draft.presidentId === undefined) {
     return [];
   }
 
-  const successorId = getSuccessorId({
-    afterPlayerId: presidentId,
-    deadPlayerIds: analysis.deadPlayerIds,
-    players: state.players
-  });
+  const preview: Game = { players: state.players, rounds: [...state.rounds, getDraftRound()] };
+  const successorId = getRotationSuccessorId(preview, analyseGame(preview).deadPlayerIds);
+  const warnings: string[] = [];
 
-  if (successorId !== chancellorId) {
-    return [];
+  if (chancellorId !== undefined && chancellorId === successorId) {
+    warnings.push(
+      `${nameOf(chancellorId)} is next in the rotation for the Presidency`
+        + ' — nominating him as Chancellor gives him both seats in a row'
+    );
   }
 
-  return [element('p', { className: 'weird' }, [
-    element('span', { className: 'weird__badge', text: 'Power play' }),
-    element(
-      'span',
-      {},
-      renderPhrase(
-        ` ${nameOf(chancellorId)} is next in the rotation for the Presidency`
-          + ' — nominating him as Chancellor gives him both seats in a row'
-      )
-    )
-  ])];
+  /*
+   * The appointee holds the Presidency next round by appointment. An appointee never becomes the
+   * anchor, so the round after that goes to the same successor the rotation was already heading
+   * for — and if that is the appointee himself, he sits twice.
+   */
+  if (appointeeId !== undefined && appointeeId === successorId) {
+    warnings.push(
+      `${nameOf(appointeeId)} is next in the rotation for the Presidency anyway`
+        + ' — appointing him makes him President twice over, now and again when the rotation resumes'
+    );
+  }
+
+  if (appointeeId !== undefined && appointeeId === chancellorId) {
+    warnings.push(
+      `${nameOf(appointeeId)} is Chancellor in this government`
+        + ' — appointing him as the next President gives him both seats in a row'
+    );
+  }
+
+  return warnings.map((warning) =>
+    element('p', { className: 'weird' }, [
+      element('span', { className: 'weird__badge', text: 'Power play' }),
+      element('span', {}, renderPhrase(` ${warning}`))
+    ])
+  );
 }
 
 function renderPowerTarget(
