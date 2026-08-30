@@ -147,7 +147,14 @@ interface Draft {
 }
 
 /** Everything the readout needs, whether it is showing the draft or a round from the history. */
-/** Why a seat may not be picked: a short form for the screen, a full one for the tooltip. */
+/**
+ * Why a seat may not be picked: a short form for the screen, a full one for the tooltip.
+ *
+ * Every `note` is a bare tag — `killed`, `ex-President`, `President` — never a sentence fragment.
+ * They are read as a list, `P1 ex-President · P2 President · P3 ex-Chancellor`, where one entry
+ * carrying a verb and the others not reads as though it means something different. Seat names keep
+ * the capitalisation they have everywhere else.
+ */
 interface Ineligibility {
   readonly note: string;
   readonly reason: string;
@@ -467,14 +474,14 @@ function getChancellorIneligibility(analysis: GameAnalysis): ReadonlyMap<string,
     const wasChancellor = lastGovernment?.chancellorId === playerId;
 
     ineligible.set(playerId, {
-      note: wasChancellor ? 'ex-chancellor' : 'ex-president',
+      note: wasChancellor ? 'ex-Chancellor' : 'ex-President',
       reason: `term-limited — was ${wasChancellor ? 'Chancellor' : 'President'} in the last government`,
       seat: wasChancellor ? 'chancellor' : 'president'
     });
   }
 
   ineligible.set(state.draft.presidentId, {
-    note: 'is President',
+    note: 'President',
     reason: 'the President cannot nominate himself',
     seat: 'president'
   });
