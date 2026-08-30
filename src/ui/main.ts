@@ -187,6 +187,12 @@ interface Ineligibility {
   readonly seat?: 'chancellor' | 'president' | undefined;
 }
 
+/** Split by which control each one is about, because that is where each one is shown. */
+interface PowerPlayWarnings {
+  readonly appointment: readonly string[];
+  readonly nomination: readonly string[];
+}
+
 interface ReadoutView {
   readonly analysis: RoundAnalysis;
   readonly chancellorClaim: number | undefined;
@@ -838,6 +844,58 @@ function getPolicyClassName(value: Policy | undefined): string {
   return value === Policy.Fascist ? 'is-fascist' : 'is-liberal';
 }
 
+/*
+ * A "power play": handing one player two seats back to back. Legal, sometimes deliberate, and it
+ * burns the rotation — so it is worth saying out loud while the table can still react, which for
+ * the nomination means before the vote.
+ *
+ * Measured against the ROTATION, never against the sitting President. He may be an appointee, and
+ * the placard does not resume from him: it resumes from the man who appointed him. Reading the
+ * successor off the President named the seat clockwise of an interruption, which in a Special
+ * Election round is nobody's turn at all.
+ */
+function getPowerPlayWarnings(): PowerPlayWarnings {
+  const chancellorId = state.draft.chancellorId;
+  const appointeeId = state.draft.specialElectionTargetId;
+  const appointment: string[] = [];
+  const nomination: string[] = [];
+
+  if (state.draft.presidentId === undefined) {
+    return { appointment, nomination };
+  }
+
+  const preview: Game = { players: state.players, rounds: [...state.rounds, getDraftRound()] };
+  const successorId = getRotationSuccessorId(preview, analyseGame(preview).deadPlayerIds);
+
+  if (chancellorId !== undefined && chancellorId === successorId) {
+    nomination.push(
+      `${nameOf(chancellorId)} is next in the rotation for the Presidency`
+        + ' — nominating him as Chancellor gives him both seats in a row'
+    );
+  }
+
+  /*
+   * The appointee holds the Presidency next round by appointment. An appointee never becomes the
+   * anchor, so the round after that goes to the same successor the rotation was already heading
+   * for — and if that is the appointee himself, he sits twice.
+   */
+  if (appointeeId !== undefined && appointeeId === successorId) {
+    appointment.push(
+      `${nameOf(appointeeId)} is next in the rotation for the Presidency anyway`
+        + ' — appointing him makes him President twice over, now and again when the rotation resumes'
+    );
+  }
+
+  if (appointeeId !== undefined && appointeeId === chancellorId) {
+    appointment.push(
+      `${nameOf(appointeeId)} is Chancellor in this government`
+        + ' — appointing him as the next President gives him both seats in a row'
+    );
+  }
+
+  return { appointment, nomination };
+}
+
 function getPowerTargetIneligibility(
   key: 'executionTargetId' | 'investigationTargetId' | 'specialElectionTargetId',
   deadIds: ReadonlySet<string>
@@ -1010,12 +1068,12 @@ function getVoteWord(vote: boolean | undefined): string {
   return vote ? 'ja' : 'nein';
 }
 
+// ---------- readout ----------
+
 /** Whether a question has been settled either way, which is what the save button waits on. */
 function isAnswered(question: Refusable, value: unknown): boolean {
   return value !== undefined || state.draft.refusals.has(question);
 }
-
-// ---------- readout ----------
 
 /** `undefined` means no assumption, which is every hand still on the table. */
 function isAssumed(assumed: readonly number[] | undefined, fascistCount: number): boolean {
@@ -1699,7 +1757,7 @@ function renderEntry(analysis: GameAnalysis): HTMLElement {
     renderPresidentField(),
     renderSeatField('Chancellor', 'chancellorId', getChancellorIneligibility(analysis)),
     renderVotesField(),
-    ...renderPowerPlayWarnings(),
+    ...renderPowerPlayWarnings(getPowerPlayWarnings().nomination),
     // Nothing downstream of the vote exists until the vote is in.
     /*
      * In the order the round actually happens. The Hitler question is asked the moment the
@@ -2054,6 +2112,8 @@ function renderHistory(analysis: GameAnalysis): HTMLElement {
   ]);
 }
 
+// ---------- history ----------
+
 function renderHistoryButton(): HTMLElement {
   const count = state.rounds.length;
 
@@ -2068,8 +2128,6 @@ function renderHistoryButton(): HTMLElement {
     title: count === 0 ? 'nothing recorded yet' : 'every round so far'
   });
 }
-
-// ---------- history ----------
 
 /** What the President did with the power, so the history is a record of actions and not just cards. */
 function renderHistoryPower(round: Round): HTMLElement[] {
@@ -2701,60 +2759,17 @@ function renderPower(analysis: GameAnalysis): HTMLElement[] {
     case 'policyPeek':
       return renderPeek(isLocked);
     case 'specialElection':
-      return [renderPowerTarget('Next President', 'specialElectionTargetId', deadIds, isLocked)];
+      return [
+        renderPowerTarget('Next President', 'specialElectionTargetId', deadIds, isLocked),
+        ...renderPowerPlayWarnings(getPowerPlayWarnings().appointment)
+      ];
     default:
       return [];
   }
 }
 
-/*
- * A "power play": handing one player two seats back to back. Legal, sometimes deliberate, and it
- * burns the rotation — so it is worth saying out loud while the table can still react, which for
- * the nomination means before the vote.
- *
- * Measured against the ROTATION, never against the sitting President. He may be an appointee, and
- * the placard does not resume from him: it resumes from the man who appointed him. Reading the
- * successor off the President named the seat clockwise of an interruption, which in a Special
- * Election round is nobody's turn at all.
- */
-function renderPowerPlayWarnings(): HTMLElement[] {
-  const chancellorId = state.draft.chancellorId;
-  const appointeeId = state.draft.specialElectionTargetId;
-
-  if (state.draft.presidentId === undefined) {
-    return [];
-  }
-
-  const preview: Game = { players: state.players, rounds: [...state.rounds, getDraftRound()] };
-  const successorId = getRotationSuccessorId(preview, analyseGame(preview).deadPlayerIds);
-  const warnings: string[] = [];
-
-  if (chancellorId !== undefined && chancellorId === successorId) {
-    warnings.push(
-      `${nameOf(chancellorId)} is next in the rotation for the Presidency`
-        + ' — nominating him as Chancellor gives him both seats in a row'
-    );
-  }
-
-  /*
-   * The appointee holds the Presidency next round by appointment. An appointee never becomes the
-   * anchor, so the round after that goes to the same successor the rotation was already heading
-   * for — and if that is the appointee himself, he sits twice.
-   */
-  if (appointeeId !== undefined && appointeeId === successorId) {
-    warnings.push(
-      `${nameOf(appointeeId)} is next in the rotation for the Presidency anyway`
-        + ' — appointing him makes him President twice over, now and again when the rotation resumes'
-    );
-  }
-
-  if (appointeeId !== undefined && appointeeId === chancellorId) {
-    warnings.push(
-      `${nameOf(appointeeId)} is Chancellor in this government`
-        + ' — appointing him as the next President gives him both seats in a row'
-    );
-  }
-
+/** Each warning sits under the control it is about, so what to change is the thing next to it. */
+function renderPowerPlayWarnings(warnings: readonly string[]): HTMLElement[] {
   return warnings.map((warning) =>
     element('p', { className: 'weird' }, [
       element('span', { className: 'weird__badge', text: 'Power play' }),
