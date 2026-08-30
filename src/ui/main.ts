@@ -498,16 +498,12 @@ function getDefaultName(index: number): string {
 // ---------- entry ----------
 
 /** A seat with no name typed shows its number rather than becoming an unlabelled button. */
-function getDiscardButtonTitle(isLocked: boolean, isMissing: boolean, isForced: boolean): string {
+function getDiscardButtonTitle(isLocked: boolean, isMissing: boolean): string {
   if (isLocked) {
     return 'ask him what he drew first';
   }
 
-  if (isMissing) {
-    return 'he says he was not holding one';
-  }
-
-  return isForced ? 'nothing to choose — he says all three were the same' : '';
+  return isMissing ? 'he says he was not holding one' : '';
 }
 
 function getDisplayName(index: number): string {
@@ -574,21 +570,6 @@ function getDraftRound(): Round {
  */
 /** Whether the session has an outcome yet — a policy on the table, or a veto. */
 /** Whether a claimed hand could have contained the card the President says he discarded. */
-/**
- * The card a claimed hand leaves him no choice about.
- *
- * FFF and LLL are the only hands where the discard is decided by the claim itself, and they are the
- * same two hands that make the pass forced — the reason those cases give an exact answer everywhere
- * else in the app.
- */
-function getForcedDiscard(claim: number | undefined): Policy | undefined {
-  if (claim === DRAW_SIZE) {
-    return Policy.Fascist;
-  }
-
-  return claim === 0 ? Policy.Liberal : undefined;
-}
-
 /**
  * The discard his claim and the law on the table leave as the only possibility.
  *
@@ -2228,26 +2209,32 @@ function renderPresidentDiscardField(): HTMLElement {
   const isLocked = claim === undefined;
 
   /*
-   * FFF and LLL decide this for him: whichever card he discarded, it was the same colour as the
-   * other two. It is filled in and both buttons go dead — leaving a live button for an answer that
-   * has only one possible value invites a tap that can only ever confirm what is already known.
+   * Nothing here is locked because the answer is implied.
+   *
+   * An earlier version froze the row for FFF and LLL, on the grounds that his hand left him no
+   * choice — but the hand is itself only what he SAYS he drew, exactly like the FFL-under-a-Liberal
+   * case that is implied by his claim plus the board. There is no line between the two, so both are
+   * filled in and both stay editable, and a man who contradicts his own account can be recorded
+   * doing it.
+   *
+   * The one option that does stay dead is a colour his claimed hand never held. That is not a
+   * judgement about plausibility: `formatHand` throws on a pass of three cards, so "I drew FFF and
+   * discarded a Liberal" would take the analysis down rather than be reported as the nonsense it is.
    */
-  const forced = getForcedDiscard(claim);
-
   const buttons = [Policy.Liberal, Policy.Fascist].map((policy) => {
     // He cannot discard a colour he says he never held, so LLL offers no Fascist and FFF no Liberal.
     const isMissing = !isLocked && !isDiscardPossible(claim, policy);
 
     return element('button', {
       className: policy === Policy.Fascist ? 'is-fascist' : 'is-liberal',
-      disabled: isLocked || isMissing || forced !== undefined,
+      disabled: isLocked || isMissing,
       onClick: () => {
         state.draft.presidentDiscard = state.draft.presidentDiscard === policy ? undefined : policy;
         render();
       },
       pressed: state.draft.presidentDiscard === policy,
       text: policy === Policy.Fascist ? 'Fascist' : 'Liberal',
-      title: getDiscardButtonTitle(isLocked, isMissing, forced !== undefined)
+      title: getDiscardButtonTitle(isLocked, isMissing)
     });
   });
 
