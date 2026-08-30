@@ -1392,7 +1392,7 @@ function renderDeck(deck: DeckState): HTMLElement {
         'span',
         { className: 'alert' },
         renderPhrase(
-          'no composition of the pile fits the record — an earlier round cannot be true as it stands'
+          'no composition of the pile fits the record — at least one of the earlier rounds cannot be true as it stands'
         )
       )
     ]);
