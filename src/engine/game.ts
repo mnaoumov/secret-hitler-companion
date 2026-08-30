@@ -500,19 +500,22 @@ function getRotationAnchorId(game: Game): string | undefined {
  */
 function getVictory(params: GetVictoryParams): undefined | Victory {
   if (params.isFascistVictoryByHitler) {
-    return { reason: `by electing Hitler as chancellor after ${String(HITLER_ZONE_THRESHOLD)} fascist laws enacted`, team: 'fascist' };
+    return {
+      reason: `by electing Hitler as Chancellor after ${String(HITLER_ZONE_THRESHOLD)} Fascist laws enacted`,
+      team: 'fascist'
+    };
   }
 
   if (params.wasHitlerExecuted) {
-    return { reason: 'by killing Hitler', team: 'liberal' };
+    return { reason: 'by executing Hitler', team: 'liberal' };
   }
 
   if (params.enactedFascistCount >= FASCIST_TRACK_LENGTH) {
-    return { reason: `by enacting ${String(FASCIST_TRACK_LENGTH)} fascist laws`, team: 'fascist' };
+    return { reason: `by enacting ${String(FASCIST_TRACK_LENGTH)} Fascist laws`, team: 'fascist' };
   }
 
   if (params.enactedLiberalCount >= LIBERAL_TRACK_LENGTH) {
-    return { reason: `by enacting ${String(LIBERAL_TRACK_LENGTH)} liberal laws`, team: 'liberal' };
+    return { reason: `by enacting ${String(LIBERAL_TRACK_LENGTH)} Liberal laws`, team: 'liberal' };
   }
 
   return undefined;

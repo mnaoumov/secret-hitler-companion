@@ -168,7 +168,7 @@ interface Draft {
 /**
  * Why a seat may not be picked: a short form for the screen, a full one for the tooltip.
  *
- * Every `note` is a bare tag — `killed`, `ex-President`, `President` — never a sentence fragment.
+ * Every `note` is a bare tag — `executed`, `ex-President`, `President` — never a sentence fragment.
  * They are read as a list, `P1 ex-President · P2 President · P3 ex-Chancellor`, where one entry
  * carrying a verb and the others not reads as though it means something different. Seat names keep
  * the capitalisation they have everywhere else.
@@ -237,7 +237,7 @@ const scrollPositions = new Map<string, ScrollPosition>();
  * are listed in their own right: in this game the team colours and the card colours are the same
  * pair, so colouring the word is right whether it names a policy or a side.
  */
-const COLOURED_TOKEN_PATTERN = /(?<token>Presidency|President|Chancellor|Fascist|Liberal|\b[FL]{2,3}\b)/g;
+const COLOURED_TOKEN_PATTERN = /(?<token>Presidency|President|Chancellor|Fascist|Liberal|Hitler|\b[FL]{2,3}\b)/g;
 
 /** Longest a typed name may be. Long enough for any real name, short enough to keep the row tidy. */
 const MAX_NAME_LENGTH = 16;
@@ -742,7 +742,8 @@ function getLieSubject(actor: 'chancellor' | 'president' | 'unknown', view: Read
   const name = playerId === undefined ? undefined : nameOf(playerId);
   const role = actor === 'president' ? 'The President' : 'The Chancellor';
 
-  return name === undefined || name === '—' ? `${role} is` : `${name} (${role.toLowerCase()}) is`;
+  // The seat keeps its capital in the parenthetical: it is the office, the same word as everywhere else.
+  return name === undefined || name === '—' ? `${role} is` : `${name} (${role}) is`;
 }
 
 function getLivingPlayers(): Player[] {
@@ -783,7 +784,7 @@ function getPowerTargetIneligibility(deadIds: ReadonlySet<string>): ReadonlyMap<
   const ineligible = new Map<string, Ineligibility>();
 
   for (const playerId of deadIds) {
-    ineligible.set(playerId, { note: 'killed', reason: 'executed — no longer at the table' });
+    ineligible.set(playerId, { note: 'executed', reason: 'executed — no longer at the table' });
   }
 
   if (selfId !== undefined) {
@@ -802,7 +803,7 @@ function getPresidentIneligibility(analysis: GameAnalysis): ReadonlyMap<string, 
   const ineligible = new Map<string, Ineligibility>();
 
   for (const playerId of analysis.deadPlayerIds) {
-    ineligible.set(playerId, { note: 'killed', reason: 'executed — may not hold office' });
+    ineligible.set(playerId, { note: 'executed', reason: 'executed — may not hold office' });
   }
 
   return ineligible;
@@ -888,7 +889,8 @@ function getTokenClassName(word: string): string {
     return 'is-chancellor';
   }
 
-  if (word === 'Fascist') {
+  // Hitler is a Fascist player, and the red already means exactly that.
+  if (word === 'Fascist' || word === 'Hitler') {
     return 'is-fascist';
   }
 
@@ -1429,16 +1431,16 @@ function renderDossier(playerId: string, analysis: GameAnalysis): HTMLElement {
   const lines: HTMLElement[] = [];
 
   if (analysis.confirmedNotHitler.includes(playerId)) {
-    lines.push(element('div', { className: 'dossier__proof', text: '\u2713 confirmed not Hitler' }));
+    lines.push(element('div', { className: 'dossier__proof' }, renderPhrase('\u2713 confirmed not Hitler')));
   }
 
-  const killedIn = state.rounds.findIndex((round) => round.executionTargetId === playerId);
+  const executedIn = state.rounds.findIndex((round) => round.executionTargetId === playerId);
 
-  if (killedIn !== -1) {
-    const killer = nameOf(state.rounds[killedIn]?.presidentId);
+  if (executedIn !== -1) {
+    const executedBy = nameOf(state.rounds[executedIn]?.presidentId);
     lines.push(element('div', {
       className: 'dossier__dead',
-      text: `\u2620 killed by ${killer} in round ${String(killedIn + 1)}`
+      text: `\u2620 executed by ${executedBy} in round ${String(executedIn + 1)}`
     }));
   }
 
@@ -1482,10 +1484,13 @@ function renderDossierClaims(playerId: string): HTMLElement[] {
       ? 'said nothing'
       : `said ${reported === Policy.Fascist ? 'Fascist' : 'Liberal'} party`;
 
-    lines.push(element('div', {
-      className: 'dossier__claim',
-      text: `Investigated by ${nameOf(round.presidentId)} in round ${String(roundIndex + 1)}, ${said}`
-    }));
+    lines.push(element(
+      'div',
+      { className: 'dossier__claim' },
+      renderPhrase(
+        `Investigated by ${nameOf(round.presidentId)} in round ${String(roundIndex + 1)}, ${said}`
+      )
+    ));
   }
 
   return lines;
@@ -1676,9 +1681,8 @@ function renderExecution(deadIds: ReadonlySet<string>, isLocked: boolean): HTMLE
               : answer.value;
             render();
           },
-          pressed: state.draft.wasExecutedPlayerHitler === answer.value,
-          text: answer.label
-        })
+          pressed: state.draft.wasExecutedPlayerHitler === answer.value
+        }, renderPhrase(answer.label))
       )
     ])
   ];
@@ -1931,10 +1935,13 @@ function renderHistory(analysis: GameAnalysis): HTMLElement {
           text: 'close'
         })
       ]),
-      element('div', {
-        className: 'history__legend',
-        text: 'CONFLICT means the record contradicts a public fact or the other seat. WEIRD breaks no rule but optimal play would never have produced it. Tap a round to review it; the toggles assume what that President really drew, starting at his claim. Rounds before a reshuffle are settled — the pile is rebuilt there, so nothing earlier can change them.'
-      }),
+      element(
+        'div',
+        { className: 'history__legend' },
+        renderPhrase(
+          'CONFLICT means the record contradicts a public fact or the other seat. WEIRD breaks no rule but optimal play would never have produced it. Tap a round to review it; the toggles assume what that President really drew, starting at his claim. Rounds before a reshuffle are settled — the pile is rebuilt there, so nothing earlier can change them.'
+        )
+      ),
       element('div', { className: 'history__cards' }, cards)
     ])
   ]);
@@ -1959,10 +1966,10 @@ function renderHistoryButton(): HTMLElement {
 
 /** What the President did with the power, so the history is a record of actions and not just cards. */
 function renderHistoryPower(round: Round): HTMLElement[] {
-  const notes: string[] = [];
+  const notes: HTMLElement[][] = [];
 
   if (round.executionTargetId !== undefined) {
-    notes.push(`killed ${nameOf(round.executionTargetId)}`);
+    notes.push(renderPhrase(`executed ${nameOf(round.executionTargetId)}`));
   }
 
   if (round.investigation) {
@@ -1970,26 +1977,32 @@ function renderHistoryPower(round: Round): HTMLElement[] {
     const said = reported === undefined
       ? 'said nothing'
       : `said ${reported === Policy.Fascist ? 'Fascist' : 'Liberal'} party`;
-    notes.push(`investigated ${nameOf(round.investigation.targetId)}, ${said}`);
+
+    notes.push(renderPhrase(`investigated ${nameOf(round.investigation.targetId)}, ${said}`));
   }
 
   if (round.specialElectionTargetId !== undefined) {
-    notes.push(`picked ${nameOf(round.specialElectionTargetId)}`);
+    notes.push(renderPhrase(`picked ${nameOf(round.specialElectionTargetId)}`));
   }
 
   if (round.peek) {
-    notes.push(`peeked ${round.peek.join('')}`);
+    /*
+     * Built from the cards rather than passed through `renderPhrase`, whose hand colouring works
+     * from a count and would reorder the sequence — FLF would be shown as FFL, which is a different
+     * claim and scored differently.
+     */
+    notes.push([element('span', { text: 'peeked ' }), ...renderPolicySequence(round.peek)]);
   }
 
   if (round.hitlerCheckAnswer === 'no') {
-    notes.push(`${nameOf(round.chancellorId)} not Hitler`);
+    notes.push(renderPhrase(`${nameOf(round.chancellorId)} not Hitler`));
   }
 
   if (round.hitlerCheckAnswer === 'yes') {
-    notes.push(`${nameOf(round.chancellorId)} IS HITLER`);
+    notes.push(renderPhrase(`${nameOf(round.chancellorId)} IS HITLER`));
   }
 
-  return notes.map((note) => element('div', { className: 'history__power', text: note }));
+  return notes.map((note) => element('div', { className: 'history__power' }, note));
 }
 
 /** Who governed and what came of it, in the two seat colours. */
@@ -2039,7 +2052,7 @@ function renderHitlerCheck(analysis: GameAnalysis): HTMLElement[] {
    */
   if (analysis.confirmedNotHitler.includes(chancellorId)) {
     return [element('div', { className: 'field field--power' }, [
-      element('span', { className: 'field__label', text: 'Is Hitler?' }),
+      element('span', { className: 'field__label' }, renderPhrase('Is Hitler?')),
       element('span', { className: 'dossier__proof' }, renderPhrase(`no — ${nameOf(chancellorId)} was asked in an earlier round`))
     ])];
   }
@@ -2050,7 +2063,7 @@ function renderHitlerCheck(analysis: GameAnalysis): HTMLElement[] {
   ] as const;
 
   return [element('div', { className: 'field field--power' }, [
-    element('span', { className: 'field__label', text: 'Is Hitler?' }),
+    element('span', { className: 'field__label' }, renderPhrase('Is Hitler?')),
     ...answers.map((answer) =>
       element('button', {
         className: answer.value === 'yes' ? 'is-fascist' : '',
@@ -2058,9 +2071,8 @@ function renderHitlerCheck(analysis: GameAnalysis): HTMLElement[] {
           state.draft.hitlerCheckAnswer = state.draft.hitlerCheckAnswer === answer.value ? undefined : answer.value;
           render();
         },
-        pressed: state.draft.hitlerCheckAnswer === answer.value,
-        text: answer.label
-      })
+        pressed: state.draft.hitlerCheckAnswer === answer.value
+      }, renderPhrase(answer.label))
     )
   ])];
 }
@@ -2642,7 +2654,7 @@ function renderPowerTarget(
   });
 
   return element('div', { className: 'field field--power' }, [
-    element('span', { className: 'field__label', text: label }),
+    element('span', { className: 'field__label' }, renderPhrase(label)),
     ...buttons,
     ...renderIneligibilityNotes(ineligible)
   ]);
@@ -2994,10 +3006,13 @@ function renderSetup(): HTMLElement {
       element('span', { className: 'field__label', text: 'Seats' }),
       ...seatButtons
     ]),
-    element('p', {
-      className: 'deck__note',
-      text: 'Seat them in the order they are sitting — the Presidency rotates that way. Names are optional.'
-    }),
+    element(
+      'p',
+      { className: 'deck__note' },
+      renderPhrase(
+        'Seat them in the order they are sitting — the Presidency rotates that way. Names are optional.'
+      )
+    ),
     element('div', { className: 'setup__seats' }, seats),
     element('button', {
       className: 'button--wide',
@@ -3134,7 +3149,7 @@ function renderVotesField(): HTMLElement {
    * bury the one note that says something.
    */
   const cannotVote = new Map<string, Ineligibility>(
-    [...deadIds].map((playerId) => [playerId, { note: 'killed', reason: 'executed — may not vote' }])
+    [...deadIds].map((playerId) => [playerId, { note: 'executed', reason: 'executed — may not vote' }])
   );
 
   return element('div', { className: 'field' }, [

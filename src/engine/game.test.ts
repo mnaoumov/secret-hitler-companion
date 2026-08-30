@@ -664,7 +664,7 @@ describe('victory', () => {
       Array.from({ length: 6 }, () => ({ enacted: Policy.Fascist, wasElected: true }))
     ));
 
-    expect(analysis.victory).toEqual({ reason: 'by enacting 6 fascist laws', team: 'fascist' });
+    expect(analysis.victory).toEqual({ reason: 'by enacting 6 Fascist laws', team: 'fascist' });
   });
 
   it('goes to the Liberals on the fifth Liberal law', () => {
@@ -672,7 +672,7 @@ describe('victory', () => {
       Array.from({ length: 5 }, () => ({ enacted: Policy.Liberal, wasElected: true }))
     ));
 
-    expect(analysis.victory).toEqual({ reason: 'by enacting 5 liberal laws', team: 'liberal' });
+    expect(analysis.victory).toEqual({ reason: 'by enacting 5 Liberal laws', team: 'liberal' });
   });
 
   it('goes to the Fascists when Hitler is elected in the zone', () => {
@@ -682,7 +682,7 @@ describe('victory', () => {
     ]));
 
     expect(analysis.victory?.team).toBe('fascist');
-    expect(analysis.victory?.reason).toContain('electing Hitler as chancellor');
+    expect(analysis.victory?.reason).toContain('electing Hitler as Chancellor');
   });
 
   /*
@@ -694,7 +694,7 @@ describe('victory', () => {
       { enacted: Policy.Fascist, executionTargetId: 'echo', presidentId: 'alpha', wasElected: true, wasExecutedPlayerHitler: true }
     ]));
 
-    expect(analysis.victory).toEqual({ reason: 'by killing Hitler', team: 'liberal' });
+    expect(analysis.victory).toEqual({ reason: 'by executing Hitler', team: 'liberal' });
   });
 
   it('is unaffected by executing someone who was not Hitler', () => {
@@ -764,7 +764,7 @@ describe('the rotation', () => {
 });
 
 describe('executions', () => {
-  it('records who was killed', () => {
+  it('records who was executed', () => {
     const analysis = analyseGame(buildGame([
       { enacted: Policy.Fascist, executionTargetId: 'echo', presidentId: 'alpha', wasElected: true }
     ]));
