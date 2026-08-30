@@ -1961,13 +1961,12 @@ function renderPeekClaim(view: ReadoutView): HTMLElement[] {
 
   const fascistCount = peek.filter((policy) => policy === Policy.Fascist).length;
 
+  // One line: with nothing to contrast it against, the figure needs no label saying which one it is.
   return [element('div', { className: 'claim' }, [
     element('div', { className: 'claim__title is-president' }, [
       element('span', { text: 'President peeked ' }),
-      ...peek.map((policy) => element('span', { className: getPolicyClassName(policy), text: policy }))
-    ]),
-    element('div', { className: 'field' }, [
-      element('span', { className: 'field__label', text: 'this order' }),
+      ...peek.map((policy) => element('span', { className: getPolicyClassName(policy), text: policy })),
+      element('span', { text: ' ' }),
       element('span', { className: 'claim__value', text: formatPercentage(getOrderedDrawProbability(view.deckAfter, fascistCount)) })
     ])
   ])];
