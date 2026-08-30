@@ -513,6 +513,10 @@ function describeMissingPower(analysis: GameAnalysis): string | undefined {
         return 'Who was executed?';
       }
 
+      if (getImpliedExecutionReveal() !== undefined) {
+        return undefined;
+      }
+
       return state.draft.wasExecutedPlayerHitler === undefined ? 'Was he Hitler?' : undefined;
     case 'investigateLoyalty':
       if (state.draft.investigationTargetId === undefined) {
@@ -594,6 +598,24 @@ function getChancellorIneligibility(analysis: GameAnalysis): ReadonlyMap<string,
   return ineligible;
 }
 
+/**
+ * Everyone the record has proved is not Hitler, this round's own answer included.
+ *
+ * The draft is added by hand rather than by running the analysis over it, because the draft round
+ * is built from this and that call would not terminate. It matters: the Chancellor who has just
+ * said he is not Hitler is the very man a President may then shoot.
+ */
+function getConfirmedNotHitlerIds(): Set<string> {
+  const ids = new Set(analyseGame({ players: state.players, rounds: state.rounds }).confirmedNotHitler);
+  const chancellorId = state.draft.chancellorId;
+
+  if (state.draft.hitlerCheckAnswer === 'no' && chancellorId !== undefined) {
+    ids.add(chancellorId);
+  }
+
+  return ids;
+}
+
 /** Derived from the rounds themselves so the draft never has to be handed an analysis. */
 function getDeadPlayerIds(): ReadonlySet<string> {
   return new Set(
@@ -619,11 +641,11 @@ function getDefaultAssumption(): readonly number[] | undefined {
   return [claim];
 }
 
+// ---------- entry ----------
+
 function getDefaultName(index: number): string {
   return `Player ${String(index + 1)}`;
 }
-
-// ---------- entry ----------
 
 /** A seat with no name typed shows its number rather than becoming an unlabelled button. */
 function getDiscardButtonTitle(isLocked: boolean, isMissing: boolean, hasNoChoice: boolean): string {
@@ -690,7 +712,13 @@ function getDraftRound(): Round {
     presidentId: state.draft.presidentId,
     specialElectionTargetId: state.draft.specialElectionTargetId,
     votes: state.draft.votes,
-    wasElected
+    wasElected,
+
+    /*
+     * Settled rather than asked when the man in the chair has already been proved not to be Hitler:
+     * the table cannot answer it twice, and the round is not incomplete for having skipped it.
+     */
+    wasExecutedPlayerHitler: getImpliedExecutionReveal() ?? state.draft.wasExecutedPlayerHitler
   };
 }
 
@@ -731,6 +759,22 @@ function getImpliedDiscard(claim: number | undefined, enacted: Policy | undefine
   const options = consistent.length > 0 ? consistent : holdable;
 
   return options.length === 1 ? options[0] : undefined;
+}
+
+/**
+ * The answer the record already gives for "was the executed player Hitler?", or nothing.
+ *
+ * Only ever `false`: being shot proves nothing by itself, but a man cleared in the zone cannot
+ * become Hitler by being executed afterwards.
+ */
+function getImpliedExecutionReveal(): boolean | undefined {
+  const targetId = state.draft.executionTargetId;
+
+  if (targetId === undefined || !getConfirmedNotHitlerIds().has(targetId)) {
+    return undefined;
+  }
+
+  return false;
 }
 
 function getLieSubject(actor: 'chancellor' | 'president' | 'unknown', view: ReadoutView): string {
@@ -1661,6 +1705,29 @@ function renderExecution(deadIds: ReadonlySet<string>, isLocked: boolean): HTMLE
 
   if (state.draft.executionTargetId === undefined) {
     return fields;
+  }
+
+  /*
+   * The answer stands in place of the question, as it does for the check itself. A row that simply
+   * vanished would read as a bug, and the reason is the interesting part: this is a man the table
+   * already cleared.
+   */
+  if (getImpliedExecutionReveal() !== undefined) {
+    const targetId = state.draft.executionTargetId;
+
+    return [
+      ...fields,
+      element('div', { className: 'field field--power' }, [
+        element('span', { className: 'field__label' }, renderPhrase('Revealed')),
+        element(
+          'span',
+          { className: 'dossier__proof' },
+          renderPhrase(
+            `not Hitler — ${nameOf(targetId)} was already asked and cleared`
+          )
+        )
+      ])
+    ];
   }
 
   const answers = [
@@ -2625,7 +2692,14 @@ function renderPowerPlayWarning(analysis: GameAnalysis): HTMLElement[] {
 
   return [element('p', { className: 'weird' }, [
     element('span', { className: 'weird__badge', text: 'Power play' }),
-    element('span', {}, renderPhrase(` ${nameOf(chancellorId)} is next in line for the Presidency — nominating him as Chancellor gives him both seats in a row`))
+    element(
+      'span',
+      {},
+      renderPhrase(
+        ` ${nameOf(chancellorId)} is next in the rotation for the Presidency`
+          + ' — nominating him as Chancellor gives him both seats in a row'
+      )
+    )
   ])];
 }
 
