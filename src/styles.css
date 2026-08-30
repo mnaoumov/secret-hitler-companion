@@ -1015,6 +1015,16 @@ button.is-claimed[aria-pressed='true'] {
   color: #fff;
 }
 
+/*
+ * Outlined rather than filled, unlike the two beside it. It is the only mark that accuses nobody —
+ * it says a stretch does not add up, and the lighter weight is the difference being shown.
+ */
+.mark--impossible {
+  border: 1px solid var(--impossible);
+  color: var(--impossible);
+  white-space: nowrap;
+}
+
 .mark--weird {
   background: var(--weird);
   color: var(--surface);

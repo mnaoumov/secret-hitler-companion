@@ -216,6 +216,12 @@ interface ReadoutView {
 /** A question that may be answered or explicitly declined. */
 type Refusable = 'chancellorClaim' | 'investigationReport' | 'peek' | 'presidentClaim' | 'presidentDiscard';
 
+/** The badge on a history card. Keyed separately from its wording so the label can be a phrase. */
+interface RoundMark {
+  readonly key: string;
+  readonly label: string;
+}
+
 interface ScrollPosition {
   readonly left: number;
   readonly top: number;
@@ -784,6 +790,42 @@ function getImpliedExecutionReveal(): boolean | undefined {
 }
 
 /**
+ * Rounds belonging to a stretch that cannot all be true at once.
+ *
+ * The pile running dry says nothing about the round whose arithmetic happened to fail. Any
+ * assumption in the stretch could be the wrong one, and the rounds after the failure are computed
+ * from a pile that no longer exists — so every one of them is implicated and none is accused.
+ *
+ * The stretch is the shuffle cycle, because a reshuffle rebuilds the pile from the discards: no
+ * assumption before one can move a number after it, so blame cannot cross it either.
+ *
+ * Derived from the analysis, so changing an assumption re-runs it like everything else.
+ */
+function getImpossibleRoundIndices(rounds: readonly RoundAnalysis[]): ReadonlySet<number> {
+  const implicated = new Set<number>();
+  let cycle: number[] = [];
+
+  rounds.forEach((round, index) => {
+    cycle.push(index);
+
+    // `didReshuffle` marks the last round of a cycle — the pile is rebuilt at the end of its session.
+    if (!round.didReshuffle && index !== rounds.length - 1) {
+      return;
+    }
+
+    if (cycle.some((cycleIndex) => rounds[cycleIndex]?.shuffle.isPossible === false)) {
+      for (const cycleIndex of cycle) {
+        implicated.add(cycleIndex);
+      }
+    }
+
+    cycle = [];
+  });
+
+  return implicated;
+}
+
+/**
  * Everyone already investigated, against the round it happened in.
  *
  * Filed rounds only. The draft's own target is not in here, because a President who has just named
@@ -1006,12 +1048,17 @@ function getReadoutView(committedAnalysis: GameAnalysis): ReadoutView | undefine
   };
 }
 
-function getRoundMark(isFlagged: boolean, isWeird: boolean): string | undefined {
+function getRoundMark(isFlagged: boolean, isImpossibleTogether: boolean, isWeird: boolean): RoundMark | undefined {
+  // A proved lie names the round it is about, so it outranks a statement about a whole stretch.
   if (isFlagged) {
-    return 'conflict';
+    return { key: 'conflict', label: 'conflict' };
   }
 
-  return isWeird ? 'weird' : undefined;
+  if (isImpossibleTogether) {
+    return { key: 'impossible', label: 'not all true' };
+  }
+
+  return isWeird ? { key: 'weird', label: 'weird' } : undefined;
 }
 
 function getSeatLetter(round: Round, playerId: string): string | undefined {
@@ -2000,6 +2047,8 @@ function renderHistory(analysis: GameAnalysis): HTMLElement {
     ]);
   }
 
+  const impossibleIndices = getImpossibleRoundIndices(analysis.rounds);
+
   const cards = state.rounds.map((round, index) => {
     const roundAnalysis = analysis.rounds[index];
     /*
@@ -2009,16 +2058,19 @@ function renderHistory(analysis: GameAnalysis): HTMLElement {
      * with the board itself. A Chancellor claiming LL under a Fascist policy is the second kind, and
      * it is a proof rather than a suspicion, so it gets the same weight as a mutual contradiction.
      *
+     * NOT ALL TRUE — no single round is contradicted, but the assumptions cannot hold together: the
+     * pile runs out of cards somebody claims to have drawn. Deliberately not CONFLICT, which promises
+     * a culprit. This one has none — it says only that one of these rounds is wrong.
+     *
      * WEIRD — nothing is contradicted; the story simply requires a choice nobody makes. FFL then FF
      * (he discarded the Liberal) and FL then F (he enacted the Fascist) are both legal and both never
      * happen in a normal game.
      */
-    const isFlagged = (roundAnalysis?.lies.length ?? 0) > 0
-      || roundAnalysis?.shuffle.isPossible === false
-      || roundAnalysis?.peekContradiction === true;
+    const isFlagged = (roundAnalysis?.lies.length ?? 0) > 0 || roundAnalysis?.peekContradiction === true;
+    const isImpossibleTogether = impossibleIndices.has(index);
     const isWeird = (roundAnalysis?.unusualPlays.length ?? 0) > 0;
     const isSelected = state.selectedRoundIndex === index;
-    const mark = getRoundMark(isFlagged, isWeird);
+    const mark = getRoundMark(isFlagged, isImpossibleTogether, isWeird);
 
     /*
      * Only the summary selects the round. The pins sit outside it, so tapping "trust" changes the
@@ -2042,7 +2094,7 @@ function renderHistory(analysis: GameAnalysis): HTMLElement {
       renderHistorySeats(round),
       element('div', { className: 'history__claims' }, [
         ...renderClaims(round),
-        ...(mark === undefined ? [] : [element('span', { className: `mark mark--${mark}`, text: mark })])
+        ...(mark === undefined ? [] : [element('span', { className: `mark mark--${mark.key}`, text: mark.label })])
       ]),
       ...renderHistoryVotes(round),
       ...renderHistoryPower(round)
@@ -2058,8 +2110,9 @@ function renderHistory(analysis: GameAnalysis): HTMLElement {
     const card = element('div', {
       className: [
         'history__round',
-        isFlagged ? 'history__round--flagged' : '',
-        isWeird && !isFlagged ? 'history__round--weird' : '',
+        // The whole stretch is outlined, because seeing where it starts and ends is the point.
+        isFlagged || isImpossibleTogether ? 'history__round--flagged' : '',
+        isWeird && !isFlagged && !isImpossibleTogether ? 'history__round--weird' : '',
         isSelected ? 'history__round--selected' : '',
         isSettled ? 'history__round--settled' : '',
         index === state.rounds.length - 1 ? 'history__round--latest' : ''
@@ -2104,7 +2157,7 @@ function renderHistory(analysis: GameAnalysis): HTMLElement {
         'div',
         { className: 'history__legend' },
         renderPhrase(
-          'CONFLICT means the record contradicts a public fact or the other seat. WEIRD breaks no rule but optimal play would never have produced it. Tap a round to review it; the toggles assume what that President really drew, starting at his claim. Rounds before a reshuffle are settled — the pile is rebuilt there, so nothing earlier can change them.'
+          'CONFLICT means the record contradicts a public fact or the other seat. NOT ALL TRUE marks a run of rounds that cannot all be true at once — the pile runs out of cards somebody claims to have drawn — and it accuses none of them in particular. WEIRD breaks no rule but optimal play would never have produced it. Tap a round to review it; the toggles assume what that President really drew, starting at his claim. Rounds before a reshuffle are settled — the pile is rebuilt there, so nothing earlier can change them.'
         )
       ),
       element('div', { className: 'history__cards' }, cards)
