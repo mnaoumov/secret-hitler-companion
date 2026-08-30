@@ -461,7 +461,7 @@ function getChancellorIneligibility(analysis: GameAnalysis): ReadonlyMap<string,
     return new Map(state.players.map((player) => [player.id, { note: 'wait', reason: 'pick the President first' }]));
   }
 
-  const ineligible = new Map<string, Ineligibility>(getPresidentIneligibility(analysis));
+  const ineligible = new Map<string, Ineligibility>();
 
   /*
    * Term limits lock the last government, so the note names which seat that player held — "was in
@@ -478,6 +478,15 @@ function getChancellorIneligibility(analysis: GameAnalysis): ReadonlyMap<string,
       reason: `term-limited — was ${wasChancellor ? 'Chancellor' : 'President'} in the last government`,
       seat: wasChancellor ? 'chancellor' : 'president'
     });
+  }
+
+  /*
+   * Death is written after the term limits, not before, so it wins. A man who was Chancellor last
+   * round and has since been shot is not "term-limited": he is out of the game, and calling him
+   * anything else invites the table to expect him back next round.
+   */
+  for (const [playerId, entry] of getPresidentIneligibility(analysis)) {
+    ineligible.set(playerId, entry);
   }
 
   ineligible.set(state.draft.presidentId, {
@@ -654,16 +663,28 @@ function getPolicyClassName(value: Policy | undefined): string {
   return value === Policy.Fascist ? 'is-fascist' : 'is-liberal';
 }
 
-function getPowerTargetIneligibility(
-  playerId: string,
-  selfId: string | undefined,
-  deadIds: ReadonlySet<string>
-): string | undefined {
-  if (deadIds.has(playerId)) {
-    return 'dead';
+function getPowerTargetIneligibility(deadIds: ReadonlySet<string>): ReadonlyMap<string, Ineligibility> {
+  /*
+   * No power may be aimed at the man holding it. A Special Election is rulebook-explicit — the
+   * President chooses "any other player at the table" — and the table's ruling extends the same to
+   * executing and to investigating himself, neither of which the rulebook spells out.
+   */
+  const selfId = state.draft.presidentId;
+  const ineligible = new Map<string, Ineligibility>();
+
+  for (const playerId of deadIds) {
+    ineligible.set(playerId, { note: 'killed', reason: 'executed — no longer at the table' });
   }
 
-  return playerId === selfId ? 'the President cannot pick himself' : undefined;
+  if (selfId !== undefined) {
+    ineligible.set(selfId, {
+      note: 'President',
+      reason: 'the President cannot pick himself',
+      seat: 'president'
+    });
+  }
+
+  return ineligible;
 }
 
 /** The dead hold no office, but the Presidency itself is never term-limited — even by a Special Election. */
@@ -2083,9 +2104,18 @@ function renderPlayersBar(analysis: GameAnalysis): HTMLElement[] {
     });
   });
 
+  /*
+   * The app's name, in the slack at the end of the seat row.
+   *
+   * It had nowhere else to be during a game: the header is full, and a screen cast to a television
+   * is usually shown without browser chrome, so the tab title nobody ever sees. Here it costs no
+   * vertical space, and it gives up its room to the chips at ten seats rather than the other way
+   * round.
+   */
   const bar = element('div', { className: 'players' }, [
     element('span', { className: 'track__label', text: 'Players' }),
-    ...chips
+    ...chips,
+    element('span', { className: 'players__app-name', text: 'Secret Hitler Companion' })
   ]);
 
   const inspected = state.inspectedPlayerId;
@@ -2220,15 +2250,10 @@ function renderPowerTarget(
   key: 'executionTargetId' | 'investigationTargetId' | 'specialElectionTargetId',
   deadIds: ReadonlySet<string>
 ): HTMLElement {
-  /*
-   * No power may be aimed at the man holding it. A Special Election is rulebook-explicit — the
-   * President chooses "any other player at the table" — and the table's ruling extends the same to
-   * executing and to investigating himself, neither of which the rulebook spells out.
-   */
-  const selfId = state.draft.presidentId;
+  const ineligible = getPowerTargetIneligibility(deadIds);
 
   const buttons = state.players.map((player, index) => {
-    const reason = getPowerTargetIneligibility(player.id, selfId, deadIds);
+    const reason = ineligible.get(player.id)?.reason;
 
     return element('button', {
       className: reason === undefined ? '' : 'is-ineligible',
@@ -2245,7 +2270,8 @@ function renderPowerTarget(
 
   return element('div', { className: 'field field--power' }, [
     element('span', { className: 'field__label', text: label }),
-    ...buttons
+    ...buttons,
+    ...renderIneligibilityNotes(ineligible)
   ]);
 }
 
@@ -2634,9 +2660,22 @@ function renderVotesField(): HTMLElement {
   const isComplete = isVoteComplete();
   const isConfirmed = state.draft.isVoteConfirmed === true;
 
+  /*
+   * Only the dead are listed. The row is also dead before a Chancellor is nominated, but that is the
+   * row waiting its turn rather than anything about a player, and naming every seat for it would
+   * bury the one note that says something.
+   */
+  const cannotVote = new Map<string, Ineligibility>(
+    [...deadIds].map((playerId) => [playerId, { note: 'killed', reason: 'executed — may not vote' }])
+  );
+
   return element('div', { className: 'field' }, [
     element('span', { className: 'field__label', text: 'Votes for the government' }),
     ...buttons,
+    ...renderIneligibilityNotes(cannotVote),
+
+    // The notes and the tally are both muted asides; without this they read as one run of words.
+    ...(cannotVote.size === 0 ? [] : [element('span', { className: 'claim__aside', text: '·' })]),
     element('span', {
       className: 'deck__note',
       text: `${String(jaCount)} ja · ${String(neinCount)} nein`

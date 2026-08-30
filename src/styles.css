@@ -225,6 +225,23 @@ body {
   padding: 0.4em 0.9em;
 }
 
+/*
+ * Pushed to the far end and allowed to shrink away to nothing. It is the least important thing in
+ * the row, so it takes whatever is left after the seats and never pushes one onto a second line.
+ */
+.players__app-name {
+  color: var(--muted);
+  flex: 0 1 auto;
+  font-size: 0.7em;
+  letter-spacing: 0.06em;
+  margin-left: auto;
+  min-width: 0;
+  overflow: hidden;
+  text-align: right;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
 .chip {
   font-size: 0.9em;
   min-height: 1.8em;
