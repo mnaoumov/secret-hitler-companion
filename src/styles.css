@@ -438,7 +438,7 @@ body {
   overflow: visible;
 }
 
-.panel--entry /*
+/*
  * A fixed slot for the tick or cross, so recording a vote never resizes the button. The label and
  * the mark are separate spans; only the slot is width-constrained, and it is wide enough for the
  * fallback glyphs the monospace face does not cover.
@@ -459,17 +459,6 @@ body {
  * The outstanding requirement is a label, not a control. Making it look like a button invited taps
  * on something that was never going to do anything.
  */
-.entry__commit {
-  align-items: center;
-  border-top: 2px solid var(--border);
-  display: flex;
-  flex: 0 0 auto;
-  gap: 0.6em;
-  justify-content: space-between;
-  margin-top: 0.4em;
-  padding-top: 0.5em;
-}
-
 .entry__missing {
   color: var(--muted);
   font-size: 0.85em;
@@ -690,7 +679,14 @@ td {
   text-align: right;
 }
 
-/* The row's subject reads left to right; only the figures are columns of numbers. */
+/*
+ * The row's subject reads left to right; only the figures are columns of numbers.
+ *
+ * The width here only does anything on a cell in the table's FIRST row, because the tables are
+ * `table-layout: fixed` and that is where such a table takes its column widths from. So the class
+ * has to be on the leading `th` as well as on the body cells — one odds table has a `thead` and one
+ * does not, and before this the one with the header silently fell back to equal thirds.
+ */
 .odds__label {
   text-align: left;
   width: 60%;
@@ -1105,3 +1101,49 @@ button.is-claimed[aria-pressed='true'] {
   text-transform: uppercase;
   writing-mode: vertical-rl;
 }
+
+/* ---------- narrow screens ---------- */
+
+/*
+ * The first width breakpoint this stylesheet has had, and it is deliberately the only one.
+ *
+ * Everything above scales with `--step`, which is how one page serves a television and a tablet at
+ * once. That stops working on a phone: `--step` hits its 15px floor at about 560px of width and
+ * cannot shrink further, so below that the layout has to change shape rather than size.
+ *
+ * 600px sits between the two real devices — a phone in portrait is around 390, a tablet 768 — so
+ * nothing that was already confirmed good is touched by anything in here.
+ */
+@media (max-width: 600px) {
+  /*
+   * The label takes its own line and the controls get the full width.
+   *
+   * The fixed 13.5em column exists so every row's buttons start at the same x. At 390px it was
+   * 46% of the content box and defeated itself: "Law enacted" split its two buttons across two
+   * lines, and a ten-seat row cost three or four. On its own line the label costs one line and
+   * gives back two, and every row's buttons still start at the same x — the left edge.
+   */
+  .field__label {
+    flex-basis: 100%;
+  }
+
+  /*
+   * Padding is not a tap target, so this is width for free: it is worth about 40px off the height
+   * of a filled round and 6px onto the odds label's column.
+   */
+  .panel {
+    padding: 0.6em;
+  }
+}
+
+/*
+ * Measured and deliberately NOT done here, so nobody tries them again:
+ *
+ * - Hiding `.board__title` on a phone buys **0px**. The header takes two rows at 390px because the
+ *   three tracks alone need about 480px; the title was already shrinking to nothing next to them
+ *   (`flex: 1 1 0`, `overflow: hidden`). Hiding it costs the app its name and changes no height.
+ * - Trimming the padding on `.board` / `.players` buys **0px** — the seats rewrap to the same four
+ *   rows either way.
+ * - Shrinking the seat chips buys **12px**, and does not remove a row. Not worth a smaller tap
+ *   target on the one device that is genuinely held in a hand.
+ */

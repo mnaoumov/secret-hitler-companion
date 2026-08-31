@@ -161,8 +161,16 @@ from three metres *and* tappable at arm's length:
 - Both discard models are equal, labelled columns — never a value plus a small grey parenthetical,
   which is unreadable across a room.
 - Tap-only after setup. Seat names default to callsigns so nobody has to type at all.
-- The heading and the **Record round** button never scroll away; only the fields and the readout
-  have a scroll fallback for short screens.
+- **`.main` is the one scroll region, and everything in it scrolls — including the heading and the
+  save-round control at the end of the form.** Nothing on the page is `sticky` or `fixed`. An
+  earlier note here claimed the heading and the button never scroll away; that was written for
+  `.entry__commit`, a bottom bar that no longer exists in the markup, and the claim outlived it. On
+  a phone the save control sits about a screen and a half down, and on a tablet about two thirds of
+  one, so do not rely on it being on screen.
+- **`--step` hits its 15px floor at roughly 560px of width**, so below that the layout has to change
+  shape rather than size. That is what the single `max-width: 600px` block at the foot of
+  `styles.css` is for, and it is the only width media query in the file — keep it that way, and keep
+  it below the tablet (768), which is confirmed good without it.
 
 ## Rules verification
 
