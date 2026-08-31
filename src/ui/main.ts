@@ -2686,7 +2686,14 @@ function renderOdds(): HTMLElement[] {
       element('table', {}, [
         element('thead', {}, [
           element('tr', {}, [
-            element('th', {}),
+            /*
+             * The class goes on this empty header cell, not only on the body cells below it. The
+             * table is `table-layout: fixed`, which takes every column width from the FIRST row —
+             * so `.odds__label`'s width on a `tbody` cell was simply ignored here, and the three
+             * columns split equally. That left 115px for "Fascist President with a Fascist
+             * Chancellor" on a phone, which wrapped it to five lines.
+             */
+            element('th', { className: 'odds__label' }),
             element('th', {}, renderPhrase('Fascist law')),
             element('th', {}, renderPhrase('Liberal law'))
           ])
