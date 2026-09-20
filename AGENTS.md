@@ -14,20 +14,21 @@ table-legal by construction.
 
 ## Commands
 
-| Task              | Command                 |
-| ----------------- | ----------------------- |
-| Run it locally    | `npm run dev`           |
-| Build the site    | `npm run build`         |
-| TypeScript check  | `npm run build:compile` |
-| Lint              | `npm run lint`          |
-| Lint (fix)        | `npm run lint:fix`      |
-| Format            | `npm run format`        |
-| Format (check)    | `npm run format:check`  |
-| Spellcheck        | `npm run spellcheck`    |
-| Markdown lint     | `npm run lint:md`       |
-| Test              | `npm run test`          |
-| Test (coverage)   | `npm run test:coverage` |
-| Commit (wizard)   | `npm run commit`        |
+| Task              | Command                               |
+| ----------------- | ------------------------------------- |
+| Run it locally    | `npm run dev`                         |
+| Build the site    | `npm run build`                       |
+| TypeScript check  | `npm run build:compile`               |
+| Lint              | `npm run lint`                        |
+| Lint (fix)        | `npm run lint:fix`                    |
+| Format            | `npm run format`                      |
+| Format (check)    | `npm run format:check`                |
+| Spellcheck        | `npm run spellcheck`                  |
+| Markdown lint     | `npm run lint:md`                     |
+| Vendored rules    | `npm run check:vendored-eslint-rules` |
+| Test              | `npm run test`                        |
+| Test (coverage)   | `npm run test:coverage`               |
+| Commit (wizard)   | `npm run commit`                      |
 
 `npm run dev` builds, watches and serves on <http://127.0.0.1:4173/>. `npm run build` writes a
 minified static `dist/` that any static server can host.
@@ -140,6 +141,16 @@ the table could do itself and the thing every later number is read against.
 - **`src/ui/`** — vanilla TS, no framework. `main.ts` re-renders the whole tree on every change,
   which is cheap at this size and removes a class of state bugs.
 - **`scripts/`** — npm script entry points (`jiti scripts/<name>.ts`), from `typescript-template`.
+  - **`helpers/eslint-rules/` is vendored, not written here.** Every file in it is a hand-copy of
+    `obsidian-dev-utils`' published source, and `npm run check:vendored-eslint-rules` asserts byte-identity
+    after three recorded transform arms. Never hand-edit a copy: take the upstream change whole, or record
+    the delta as a transform arm in `scripts/check-vendored-eslint-rules.ts` so every later run enforces it.
+    The gate walks for the FILE NAME rather than a fixed directory, lists upstream from the GitHub contents
+    API rather than from a roster restated locally, and reads this side out of the **git index**
+    (`scripts/helpers/git-content.ts`) so the `lint:fix` running beside it under nano-staged cannot decide
+    what it sees. It runs from the pre-commit hook on a staged copy and from CI on every push — the CI half
+    is the only one that can notice upstream moving under a tree nobody is editing, so do not drop it.
+    `CHECK_VENDORED_ESLINT_RULES=0` turns it off for an offline run.
 
 ### Deck bookkeeping
 
