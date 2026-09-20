@@ -43,6 +43,16 @@ jobs:
       - name: Markdown lint
         run: npm run lint:md
 
+      # The rule sources under `scripts/helpers/eslint-rules/` are hand-copies of `obsidian-dev-utils`'.
+      # The pre-commit hook runs this too, but only when a copy is STAGED, so it can never notice upstream
+      # moving underneath a tree nobody is editing — which is the drift direction that produced the gate.
+      # `GITHUB_TOKEN` is the runner's own token: unauthenticated, GitHub's contents API allows 60 requests
+      # an hour per address, which a shared runner can have spent before this step is reached.
+      - name: Check vendored ESLint rules
+        run: npm run check:vendored-eslint-rules
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
       - name: Test
         run: npm run test
 
