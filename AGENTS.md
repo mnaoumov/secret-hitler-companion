@@ -151,6 +151,32 @@ the table could do itself and the thing every later number is read against.
     what it sees. It runs from the pre-commit hook on a staged copy and from CI on every push — the CI half
     is the only one that can notice upstream moving under a tree nobody is editing, so do not drop it.
     `CHECK_VENDORED_ESLINT_RULES=0` turns it off for an offline run.
+  - **`helpers/*.ts` is a shared roster, hand-copied and not gated yet.** Every file beside
+    `eslint-rules/` except `site-build.ts` — nine of them — is one copy of a roster `typescript-template`,
+    `obsidian-test-mocks` and `obsidian-typings-crawler` carry too, and the intent is that the copies are
+    byte-identical. They were re-synced from `obsidian-test-mocks` on 2026-09-20, after eight of the nine
+    had quietly fallen behind. Four now match that peer byte-for-byte. The five that do not fall
+    into four groups — converging any of them without reading this would undo a decision:
+    - **`root.ts`** — one line short: upstream's inline `unicorn/prefer-minimal-ternary` disable is
+      stripped. ESLint fails a **whole run** on an unresolvable rule reference, and this repo installs no
+      `eslint-plugin-unicorn`. Same delta the rule-source gate's second transform arm records.
+    - **`eslint.ts`, `format.ts`** — they spell `npx` where upstream calls `resolveToolCommand`, because
+      `helpers/package-manager.ts` is deliberately not carried here. This repo is npm-only.
+    - **`markdownlint.ts`** — the same `npx`, plus the local `linkinator.config.json` skip list, which
+      upstream has no equivalent of. **That file is load-bearing, not a preference**: repeating `--skip` on
+      the command line does not accumulate in this version of linkinator (the second occurrence makes it
+      skip *every* link and report a silent "scanned 0 links"), and on Windows `npx` resolves to a `.cmd`
+      shim that re-parses its arguments, so a pattern holding `|` is split there as a pipe. The helper's
+      own comment says so; keep both.
+    - **`git-content.ts`** — **ahead** of `obsidian-test-mocks`, not behind. Its header and its
+      `isMissingPath` comment say a non-repository is thrown rather than reported as an absent blob, which
+      is what the code does; the peer's copy still says otherwise. It matches `typescript-template`
+      exactly. Do not converge it toward the peer — that sync runs the other way.
+
+    Nothing asserts any of this yet. The settled answer is a `check:helpers-sync` roster gate, built on the
+    rule-source gate's machinery and asserting byte-identity against a peer with these four recorded as
+    exceptions; it is being built in `typescript-template` first, and adopted here after. Until it exists,
+    re-sync by hand and re-read this list.
 
 ### Deck bookkeeping
 

@@ -7,5 +7,5 @@ interface LintOptions {
 
 export async function lint(options: LintOptions = {}): Promise<void> {
   const targets = options.paths?.length ? options.paths : ['.'];
-  await execFromRoot(['npx', 'eslint', ...(options.shouldFix ? ['--fix'] : []), { batchedArgs: targets }]);
+  await execFromRoot(['npx', 'eslint', ...(options.shouldFix ? ['--fix'] : []), { batchedArguments: targets }]);
 }

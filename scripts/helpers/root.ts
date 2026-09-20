@@ -24,11 +24,7 @@ export function execFromRoot(command: CommandPart[] | string, options: ExecOptio
     throw new Error('Could not find root folder');
   }
 
-  if (options.shouldIncludeDetails) {
-    return exec(command, { ...options, cwd: root, shouldIncludeDetails: true });
-  }
-
-  return exec(command, { ...options, cwd: root, shouldIncludeDetails: false });
+  return options.shouldIncludeDetails ? exec(command, { ...options, cwd: root, shouldIncludeDetails: true }) : exec(command, { ...options, cwd: root, shouldIncludeDetails: false });
 }
 
 export function getRootFolder(cwd?: string): null | string {
