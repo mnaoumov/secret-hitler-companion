@@ -164,7 +164,7 @@ const TRANSFORM_ARMS: readonly TransformArm[] = [
     reason: 'Upstream carries inline `unicorn/…` disables, and this repo installs no `eslint-plugin-unicorn` at all - ESLint fails a WHOLE run on an unresolvable rule reference, and a file-scoped `\'unicorn/…\': \'off\'` override fails the same way, so stripping the line is the only shape available. This arm takes every file rather than a named one, because the rules that carry such a line upstream are not a fixed set: today they are `no-async-callback-to-unsafe-return.ts` and `require-method-template.ts`.'
   },
   {
-    apply: (text) => text.replace(UPSTREAM_REG_EXP_IMPORT, LOCAL_TYPE_GUARDS_IMPORT).replace(UPSTREAM_NAMED_GROUP_READS, LOCAL_NAMED_GROUP_READS),
+    apply: (text) => text.replace(UPSTREAM_REG_EXP_IMPORT, () => LOCAL_TYPE_GUARDS_IMPORT).replace(UPSTREAM_NAMED_GROUP_READS, () => LOCAL_NAMED_GROUP_READS),
     fileNames: ['require-method-template.ts'],
     reason: 'Upstream reads this rule\'s named groups with `getMandatoryNamedGroup` from its own `reg-exp.ts`, a 238-line module carrying an enum, a flag-merger class and `oneOf`. Vendoring all of that for one three-line call site would invent a divergence axis no sibling has, so the local `ensureNonNullable` serves instead. No `@obsidian` sibling vendors this rule, which is why none of them carries this arm.'
   }
