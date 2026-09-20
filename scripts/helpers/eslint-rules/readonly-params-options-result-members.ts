@@ -12,12 +12,18 @@ import type { Rule } from 'eslint';
 
 import { ensureNonNullable } from '../type-guards.ts';
 
+/**
+Message ID reported when a member of a `*Params`/`*Options`/`*Result` interface is not declared `readonly`.
+ */
 export const MESSAGE_ID = 'readonlyParamsOptionsResultMembers';
 
 interface PropertySignatureNode {
   readonly key: Rule.Node;
 }
 
+/**
+ * ESLint rule requiring every property of a `*Params`, `*Options`, or `*Result` interface to be `readonly`.
+ */
 export const readonlyParamsOptionsResultMembers: Rule.RuleModule = {
   create(context) {
     return {
@@ -28,17 +34,6 @@ export const readonlyParamsOptionsResultMembers: Rule.RuleModule = {
         reportNonReadonly(context, node);
       }
     };
-
-    function reportNonReadonly(ctx: Rule.RuleContext, node: Rule.Node): void {
-      const propertyNode = node as Partial<PropertySignatureNode>;
-      ctx.report({
-        fix(fixer) {
-          return fixer.insertTextBefore(ensureNonNullable(propertyNode.key), 'readonly ');
-        },
-        messageId: MESSAGE_ID,
-        node
-      });
-    }
   },
   meta: {
     docs: {
@@ -52,3 +47,14 @@ export const readonlyParamsOptionsResultMembers: Rule.RuleModule = {
     type: 'suggestion'
   }
 };
+
+function reportNonReadonly($context: Rule.RuleContext, node: Rule.Node): void {
+  const propertyNode = node as Partial<PropertySignatureNode>;
+  $context.report({
+    fix(fixer) {
+      return fixer.insertTextBefore(ensureNonNullable(propertyNode.key), 'readonly ');
+    },
+    messageId: MESSAGE_ID,
+    node
+  });
+}
