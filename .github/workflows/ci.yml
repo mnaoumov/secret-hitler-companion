@@ -5,6 +5,8 @@ on:
     branches:
       - main
   pull_request:
+  # A clean new run of `main` without inventing a commit, for when a deploy has to be redone.
+  workflow_dispatch:
 
 # Only one deployment at a time, and never cancel one half-way: an interrupted Pages deploy can
 # leave the live site on a partial upload.
@@ -91,7 +93,7 @@ jobs:
   # the site is read by a table mid-game, so a broken build must never reach it.
   deploy:
     needs: check
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
 
     permissions:
@@ -121,11 +123,19 @@ jobs:
 
       # The built page references `app.js` and `styles.css` relatively, so it needs no base path and
       # works unchanged under the `/secret-hitler-companion/` prefix of a project page.
+      #
+      # The artifact is named per attempt. Artifacts belong to the RUN, not the attempt, and a re-run never
+      # clears an earlier attempt's, so under the fixed default name `github-pages` every re-run of a failed
+      # deploy added one more and `deploy-pages` refused them all ("Multiple artifacts named github-pages").
+      # A transient deploy failure then could not be recovered by re-running it.
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v5
         with:
+          name: github-pages-${{ github.run_attempt }}
           path: dist
 
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v5
+        with:
+          artifact_name: github-pages-${{ github.run_attempt }}
