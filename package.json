@@ -22,6 +22,7 @@
   "scripts": {
     "build": "jiti scripts/build.ts",
     "build:compile": "jiti scripts/build-compile.ts",
+    "check:helpers-sync": "jiti scripts/check-helpers-sync.ts",
     "check:vendored-eslint-rules": "jiti scripts/check-vendored-eslint-rules.ts",
     "commit": "jiti scripts/commit.ts",
     "dev": "jiti scripts/dev.ts",

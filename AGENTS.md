@@ -26,6 +26,7 @@ table-legal by construction.
 | Spellcheck        | `npm run spellcheck`                  |
 | Markdown lint     | `npm run lint:md`                     |
 | Vendored rules    | `npm run check:vendored-eslint-rules` |
+| Shared helpers    | `npm run check:helpers-sync`          |
 | Test              | `npm run test`                        |
 | Test (coverage)   | `npm run test:coverage`               |
 | Commit (wizard)   | `npm run commit`                      |
@@ -151,32 +152,37 @@ the table could do itself and the thing every later number is read against.
     what it sees. It runs from the pre-commit hook on a staged copy and from CI on every push — the CI half
     is the only one that can notice upstream moving under a tree nobody is editing, so do not drop it.
     `CHECK_VENDORED_ESLINT_RULES=0` turns it off for an offline run.
-  - **`helpers/*.ts` is a shared roster, hand-copied and not gated yet.** Every file beside
-    `eslint-rules/` except `site-build.ts` — nine of them — is one copy of a roster `typescript-template`,
-    `obsidian-test-mocks` and `obsidian-typings-crawler` carry too, and the intent is that the copies are
-    byte-identical. They were re-synced from `obsidian-test-mocks` on 2026-09-20, after eight of the nine
-    had quietly fallen behind. Four now match that peer byte-for-byte. The five that do not fall
-    into four groups — converging any of them without reading this would undo a decision:
-    - **`root.ts`** — one line short: upstream's inline `unicorn/prefer-minimal-ternary` disable is
-      stripped. ESLint fails a **whole run** on an unresolvable rule reference, and this repo installs no
-      `eslint-plugin-unicorn`. Same delta the rule-source gate's second transform arm records.
-    - **`eslint.ts`, `format.ts`** — they spell `npx` where upstream calls `resolveToolCommand`, because
-      `helpers/package-manager.ts` is deliberately not carried here. This repo is npm-only.
-    - **`markdownlint.ts`** — the same `npx`, plus the local `linkinator.config.json` skip list, which
-      upstream has no equivalent of. **That file is load-bearing, not a preference**: repeating `--skip` on
-      the command line does not accumulate in this version of linkinator (the second occurrence makes it
-      skip *every* link and report a silent "scanned 0 links"), and on Windows `npx` resolves to a `.cmd`
-      shim that re-parses its arguments, so a pattern holding `|` is split there as a pipe. The helper's
-      own comment says so; keep both.
-    - **`git-content.ts`** — **ahead** of `obsidian-test-mocks`, not behind. Its header and its
-      `isMissingPath` comment say a non-repository is thrown rather than reported as an absent blob, which
-      is what the code does; the peer's copy still says otherwise. It matches `typescript-template`
-      exactly. Do not converge it toward the peer — that sync runs the other way.
-
-    Nothing asserts any of this yet. The settled answer is a `check:helpers-sync` roster gate, built on the
-    rule-source gate's machinery and asserting byte-identity against a peer with these four recorded as
-    exceptions; it is being built in `typescript-template` first, and adopted here after. Until it exists,
-    re-sync by hand and re-read this list.
+  - **`helpers/` is a shared roster, gated by `npm run check:helpers-sync`.** Every file under it except
+    `eslint-rules/` and `site-build.ts` is a peer copy of `typescript-template`'s, and the gate asserts
+    byte-identity against that repo's `main` after the differences recorded in `scripts/check-helpers-sync.ts`.
+    `obsidian-test-mocks` and `obsidian-typings-crawler` carry the same roster. They are second opinions, not
+    gates. **Change a helper in the template first and take its bytes here**; the gate fails on a local edit
+    that is not recorded. What it does, and the decisions behind it:
+    - **The peer is `typescript-template`.** It is what this repo was scaffolded from, it is where helper fixes
+      land first, and it carries the suites for `eslint.ts`, `exec.ts` and `git-content.ts`. It was chosen by
+      measurement: `typescript-template` and `obsidian-test-mocks` each matched 6 of the 11 files here.
+    - **`package-manager.ts` is carried**, with its suite, so `eslint.ts`, `format.ts` and `markdownlint.ts`
+      run their tools through `resolveToolCommand` as the peer does rather than through a hand-spelt `npx`.
+    - **The recorded differences are all mechanical or header prose, and nothing is a whole-file
+      exception.** Three transform arms reproduce this repo's copy from the peer's, so the rest of each file
+      stays gated:
+      - **`root.ts`**: the peer's inline `unicorn/prefer-minimal-ternary` disable is stripped. ESLint fails
+        a **whole run** on an unresolvable rule reference, and this repo installs no `eslint-plugin-unicorn`.
+        The rule-source gate strips the same directive from the vendored rules.
+      - **`markdownlint.ts`**: the local `linkinator.config.json` skip list, which the peer has no
+        equivalent of. **That file is load-bearing, not a preference**: repeating `--skip` on the command
+        line does not accumulate in this version of linkinator (the second occurrence makes it skip *every*
+        link and report a silent "scanned 0 links"), and on Windows the tool resolves to a `.cmd` shim that
+        re-parses its arguments, so a pattern holding `|` is split there as a pipe. The helper's own comment
+        says so. Keep both.
+      - **`git-content.test.ts`**: the package name its first case asserts. That file's `@file` header is
+        also written about this checkout, so it is compared with the header excluded from both sides.
+    - The roster is the whole tree minus `eslint-rules/`, including `@types/`, which the nano-staged key
+      `**/helpers/**/*.ts` reaches only because it has two globstars. This side is read from the **git
+      index**, for the same nano-staged reason as the rule-source gate. It runs from the pre-commit hook and
+      from CI, and `CHECK_HELPERS_SYNC=0` turns it off for an offline run.
+    - The suites under `scripts/helpers/` run in the `unit-tests:scripts` vitest project. Without that
+      project nothing would collect them.
 
 ### Deck bookkeeping
 
