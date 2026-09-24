@@ -53,6 +53,14 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
+      # The helpers under `scripts/helpers/` are peer copies of `typescript-template`'s. Same reasoning as
+      # the step above: the pre-commit hook runs this too, but only when a copy is STAGED, so it can never
+      # notice the peer moving underneath a file nobody is editing.
+      - name: Check helpers sync
+        run: npm run check:helpers-sync
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
       - name: Test
         run: npm run test
 

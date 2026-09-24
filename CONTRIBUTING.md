@@ -70,6 +70,18 @@ upstream after the deltas recorded in `scripts/check-vendored-eslint-rules.ts`. 
 the upstream change whole, or record a new delta as a transform arm. It fetches from GitHub, so
 `CHECK_VENDORED_ESLINT_RULES=0` turns it off for a run when you are offline.
 
+### Shared script helpers
+
+```bash
+npm run check:helpers-sync
+```
+
+The other files under `scripts/helpers/` are peer copies of
+[`typescript-template`](https://github.com/mnaoumov/typescript-template)'s, and this asserts they are
+byte-identical to the peer after the differences recorded in `scripts/check-helpers-sync.ts`. Change a helper
+in the template first and take its bytes here, or record the difference in that script. It fetches from
+GitHub, so `CHECK_HELPERS_SYNC=0` turns it off for a run when you are offline.
+
 ### Test
 
 ```bash
@@ -81,5 +93,5 @@ npm run test:coverage
 
 - Base your PR on the `main` branch.
 - Ensure all checks pass (`build:compile`, `lint`, `format:check`, `spellcheck`, `lint:md`,
-  `check:vendored-eslint-rules`, `test`).
+  `check:vendored-eslint-rules`, `check:helpers-sync`, `test`).
 - Use [Conventional Commits](https://www.conventionalcommits.org/) for your commit messages.

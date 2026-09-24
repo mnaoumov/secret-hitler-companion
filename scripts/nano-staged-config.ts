@@ -44,6 +44,21 @@ const tasks: Record<string, string[]> = {
    */
   '**/eslint-rules/*.ts': [
     'npm run check:vendored-eslint-rules --'
+  ],
+  /*
+   * The shared script helpers, which are peer copies of `typescript-template`'s and are supposed to be the
+   * same bytes after the transforms `scripts/check-helpers-sync.ts` records. Everything the comment above
+   * says about racing `lint:fix` applies here for the same reason, and is answered the same way: the gate
+   * reads the git index, so this group's position says nothing about which bytes it sees.
+   *
+   * The glob deliberately carries two globstars rather than one: the roster includes
+   * `scripts/helpers/@types/`, and the single-star form does not reach it (measured against nano-staged
+   * 1.0.2's own `globToRegex`). It therefore overlaps the key above on the `eslint-rules/` subtree, which
+   * costs one extra listing call on a commit that edits a rule source and is the cheaper mistake than a
+   * staged `@types` copy that nothing checks.
+   */
+  '**/helpers/**/*.ts': [
+    'npm run check:helpers-sync --'
   ]
 };
 
