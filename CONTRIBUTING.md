@@ -31,6 +31,11 @@ This project uses [Conventional Commits](https://www.conventionalcommits.org/). 
 npm run commit
 ```
 
+The commit message is also checked for identifiers that point into notes kept outside this repository,
+which a reader here cannot look up. Refer to a path, a symbol, a commit hash or an issue number from this
+repository's own tracker instead. The `commit-msg` hook runs the check, and CI runs it again over every
+pushed range.
+
 ### Lint
 
 ```bash

@@ -18,6 +18,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          # The commit-message step below needs the commits of the pushed range, not only its tip.
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
@@ -27,6 +30,26 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      # `.husky/commit-msg` lints every local commit, but `--no-verify` skips it and a commit made in
+      # another checkout never meets it — which is how the one message carrying a private backlog id
+      # reached `main`. So the pushed range is linted again here. Only the NEW commits: the history
+      # before this step existed holds that one message, and rewriting published history is a separate
+      # decision from guarding against the next one. A push that creates a branch has no `before`.
+      - name: Lint commit messages
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PUSH_BEFORE: ${{ github.event.before }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "$EVENT_NAME" = pull_request ]; then
+            npx --no -- commitlint --from "$PR_BASE" --to "$PR_HEAD" --verbose
+          elif [ -n "$PUSH_BEFORE" ] && [ "$PUSH_BEFORE" != 0000000000000000000000000000000000000000 ]; then
+            npx --no -- commitlint --from "$PUSH_BEFORE" --to "$GITHUB_SHA" --verbose
+          else
+            echo 'No previous commit to compare against; nothing to lint.'
+          fi
 
       - name: Type check
         run: npm run build:compile
