@@ -264,6 +264,18 @@ Two things to preserve if the build changes:
   without a base-path rewrite. An absolute path would 404 there while still working locally.
 - **The artifact is `dist/`, served as-is.** Pages runs no Jekyll on an Actions-uploaded artifact, so
   no `.nojekyll` is needed and nothing is post-processed.
+- **The artifact is named per attempt (`github-pages-<run_attempt>`), on both the upload and the deploy
+  step.** Artifacts belong to the run, not the attempt, and a re-run never clears an earlier attempt's. Under
+  the fixed default name every re-run of a failed deploy added another `github-pages`, and `deploy-pages`
+  refuses any count but one, so a transient failure (an OIDC `Failed to get ID Token` timeout, say) wedged
+  that commit's deployment for good. Keep the two names in step.
+
+A failed deploy is now recovered by **re-running the failed jobs**, or by running the workflow by hand from
+the Actions tab (`workflow_dispatch`, `main` only), which starts a clean run without a new commit. Do not
+follow the error's own advice on a run that predates the per-attempt name: re-running it adds one more
+`github-pages`. That run is recovered only by deleting **every** `github-pages` artifact on it first
+(`gh api repos/<owner>/<repo>/actions/runs/<id>/artifacts`, then `DELETE .../actions/artifacts/<id>` for each)
+and then re-running. Leaving one is not enough.
 
 ## Testing
 
