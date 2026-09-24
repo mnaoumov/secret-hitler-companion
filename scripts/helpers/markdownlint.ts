@@ -2,6 +2,7 @@ import { glob } from 'node:fs/promises';
 import { relative } from 'node:path';
 import process from 'node:process';
 
+import { resolveToolCommand } from './package-manager.ts';
 import {
   execFromRoot,
   toPosixPath
@@ -12,7 +13,7 @@ import {
  *
  * - Repeating `--skip` does not accumulate in this version of linkinator. A second occurrence makes
  *   it skip *every* link and report "scanned 0 links" — a silent pass that checks nothing.
- * - On Windows, `npx` resolves to a `.cmd` shim, and a shim re-parses the arguments cmd already
+ * - On Windows, the tool resolves to a `.cmd` shim, and a shim re-parses the arguments cmd already
  *   handed it. A pattern holding `|` is split there as a pipe no matter how carefully it was
  *   escaped on the way in: `^https?://(127\.0\.0\.1|localhost)` made cmd try to run `localhost)`
  *   as a program. `exec.ts` is not at fault — the same argument reaches a real `.exe` intact.
@@ -27,7 +28,7 @@ interface LintOptions {
 export async function lint(options?: LintOptions): Promise<void> {
   const { paths, shouldFix = false } = options ?? {};
   const targets = paths?.length ? paths : ['.'];
-  await execFromRoot(['npx', 'markdownlint-cli2', ...(shouldFix ? ['--fix'] : []), { batchedArguments: targets }]);
+  await execFromRoot([...resolveToolCommand({ tool: 'markdownlint-cli2' }), ...(shouldFix ? ['--fix'] : []), { batchedArguments: targets }]);
 
   const mdFiles = paths?.length
     ? paths.map((p) => toPosixPath(relative(process.cwd(), p)) || p)
@@ -35,12 +36,15 @@ export async function lint(options?: LintOptions): Promise<void> {
       exclude: [
         '.git/**',
         'dist/**',
+        // A repo with a documentation site under `docs/` validates that markdown in `docs:build`, against the BUILT html.
+        // Linkinator would resolve a base-absolute in-site link (`/<site-base>/guides/...`) against the containing folder instead.
+        // So every one of those links would 404 here.
+        'docs/**',
         'node_modules/**'
       ]
     }));
   await execFromRoot([
-    'npx',
-    'linkinator',
+    ...resolveToolCommand({ tool: 'linkinator' }),
     '--config',
     LINKINATOR_CONFIG_FILE,
     '--retry',
