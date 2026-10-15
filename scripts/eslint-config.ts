@@ -13,6 +13,11 @@ import type { Linter } from 'eslint';
 
 import commentsConfigs from '@eslint-community/eslint-plugin-eslint-comments/configs';
 import eslint from '@eslint/js';
+import {
+  IN_HOUSE_ESLINT_PLUGIN_NAME,
+  inHouseEslintPlugin
+} from '@mnaoumov/typescript-dev-toolkit/linters/eslint-rules/in-house-plugin';
+import { getRootFolder } from '@mnaoumov/typescript-dev-toolkit/root';
 // eslint-disable-next-line import-x/no-rename-default -- The default export name `plugin` is too confusing.
 import stylistic from '@stylistic/eslint-plugin';
 import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescript';
@@ -30,9 +35,6 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path/posix';
 // eslint-disable-next-line import-x/no-rename-default -- The default export name `_default` is too confusing.
 import tseslint from 'typescript-eslint';
-
-import { obsidianDevUtilsPlugin } from './helpers/eslint-rules/obsidian-dev-utils-plugin.ts';
-import { getRootFolder } from './helpers/root.ts';
 
 const rootConfigFiles = [
   'commitlint.config.ts',
@@ -71,7 +73,7 @@ function getCustomPluginConfigs(): Linter.Config[] {
     {
       files: allFiles,
       plugins: {
-        'obsidian-dev-utils': obsidianDevUtilsPlugin
+        [IN_HOUSE_ESLINT_PLUGIN_NAME]: inHouseEslintPlugin
       },
       rules: {
         'obsidian-dev-utils/no-unused-params-members': 'error',
@@ -503,12 +505,6 @@ function getNoRestrictedSyntaxRulesConfigs(): Linter.Config[] {
             selector: 'TSMappedType:not(TSTypeAliasDeclaration > TSMappedType)'
           }
         ]
-      }
-    },
-    {
-      files: ['scripts/helpers/@types/**/*.d.ts'],
-      rules: {
-        'no-restricted-syntax': 'off'
       }
     }
   ]);

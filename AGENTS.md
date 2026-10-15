@@ -14,22 +14,20 @@ table-legal by construction.
 
 ## Commands
 
-| Task              | Command                               |
-| ----------------- | ------------------------------------- |
-| Run it locally    | `npm run dev`                         |
-| Build the site    | `npm run build`                       |
-| TypeScript check  | `npm run build:compile`               |
-| Lint              | `npm run lint`                        |
-| Lint (fix)        | `npm run lint:fix`                    |
-| Format            | `npm run format`                      |
-| Format (check)    | `npm run format:check`                |
-| Spellcheck        | `npm run spellcheck`                  |
-| Markdown lint     | `npm run lint:md`                     |
-| Vendored rules    | `npm run check:vendored-eslint-rules` |
-| Shared helpers    | `npm run check:helpers-sync`          |
-| Test              | `npm run test`                        |
-| Test (coverage)   | `npm run test:coverage`               |
-| Commit (wizard)   | `npm run commit`                      |
+| Task              | Command                 |
+| ----------------- | ----------------------- |
+| Run it locally    | `npm run dev`           |
+| Build the site    | `npm run build`         |
+| TypeScript check  | `npm run build:compile` |
+| Lint              | `npm run lint`          |
+| Lint (fix)        | `npm run lint:fix`      |
+| Format            | `npm run format`        |
+| Format (check)    | `npm run format:check`  |
+| Spellcheck        | `npm run spellcheck`    |
+| Markdown lint     | `npm run lint:md`       |
+| Test              | `npm run test`          |
+| Test (coverage)   | `npm run test:coverage` |
+| Commit (wizard)   | `npm run commit`        |
 
 `npm run dev` builds, watches and serves on <http://127.0.0.1:4173/>. `npm run build` writes a
 minified static `dist/` that any static server can host.
@@ -142,52 +140,29 @@ the table could do itself and the thing every later number is read against.
 - **`src/ui/`** — vanilla TS, no framework. `main.ts` re-renders the whole tree on every change,
   which is cheap at this size and removes a class of state bugs.
 - **`scripts/`** — npm script entry points (`jiti scripts/<name>.ts`), from `typescript-template`.
-  - **`helpers/eslint-rules/` is vendored, not written here.** Every file in it is a hand-copy of
-    `obsidian-dev-utils`' published source under `packages/typescript-dev-toolkit/src/linters/eslint-rules/`
-    (`src/script-utils/linters/eslint-rules/` until the 2026-10-14 workspace split), and
-    `npm run check:vendored-eslint-rules` asserts byte-identity after three recorded transform arms:
-    `require-method-template` reads its named groups with the local `ensureNonNullable`; every
-    `@mnaoumov/typescript-lib/<module>` import becomes `../<module>.ts`, moved into the relative import group;
-    and upstream's inline `unicorn/…` disables are stripped, since this repo installs no `eslint-plugin-unicorn`.
-    That second arm is why `helpers/type-guards.ts` and `helpers/object-utils.ts` (the one `castTo` the
-    vendored `ts-estree-node.ts` calls) sit beside the tree. Never hand-edit a copy: take the upstream change whole, or record
-    the delta as a transform arm in `scripts/check-vendored-eslint-rules.ts` so every later run enforces it.
-    The gate walks for the FILE NAME rather than a fixed directory, lists upstream from the GitHub contents
-    API rather than from a roster restated locally, and reads this side out of the **git index**
-    (`scripts/helpers/git-content.ts`) so the `lint:fix` running beside it under nano-staged cannot decide
-    what it sees. It runs from the pre-commit hook on a staged copy and from CI on every push — the CI half
-    is the only one that can notice upstream moving under a tree nobody is editing, so do not drop it.
-    `CHECK_VENDORED_ESLINT_RULES=0` turns it off for an offline run.
-  - **`helpers/` is a shared roster, gated by `npm run check:helpers-sync`.** Every file under it except
-    `eslint-rules/` and `site-build.ts` is a peer copy of `typescript-template`'s, and the gate asserts
-    byte-identity against that repo's `main` after the differences recorded in `scripts/check-helpers-sync.ts`.
-    `obsidian-test-mocks` and `obsidian-typings-crawler` carry the same roster. They are second opinions, not
-    gates. **Change a helper in the template first and take its bytes here**; the gate fails on a local edit
-    that is not recorded. What it does, and the decisions behind it:
-    - **The peer is `typescript-template`.** It is what this repo was scaffolded from, it is where helper fixes
-      land first, and it carries the suites for `eslint.ts`, `exec.ts` and `git-content.ts`. It was chosen by
-      measurement: `typescript-template` and `obsidian-test-mocks` each matched 6 of the 11 files here.
-    - **`package-manager.ts` is carried**, with its suite, so `eslint.ts`, `format.ts` and `markdownlint.ts`
-      run their tools through `resolveToolCommand` as the peer does rather than through a hand-spelt `npx`.
-    - **The recorded differences are all mechanical, and nothing is a whole-file exception.** Two transform
-      arms reproduce this repo's copy from the peer's, so the rest of each file stays gated:
-      - **`root.ts`**: the peer's inline `unicorn/prefer-minimal-ternary` disable is stripped. ESLint fails
-        a **whole run** on an unresolvable rule reference, and this repo installs no `eslint-plugin-unicorn`.
-        The rule-source gate strips the same directive from the vendored rules.
-      - **`markdownlint.ts`**: the local `linkinator.config.json` skip list, which the peer has no
-        equivalent of. **That file is load-bearing, not a preference**: repeating `--skip` on the command
-        line does not accumulate in this version of linkinator (the second occurrence makes it skip *every*
-        link and report a silent "scanned 0 links"), and on Windows the tool resolves to a `.cmd` shim that
-        re-parses its arguments, so a pattern holding `|` is split there as a pipe. The helper's own comment
-        says so. Keep both.
-      - `git-content.test.ts` used to carry a third arm and a header-only entry. The peer made that suite
-        repo-neutral, so it is now taken byte for byte.
-    - The roster is the whole tree minus `eslint-rules/`, including `@types/`, which the nano-staged key
-      `**/helpers/**/*.ts` reaches only because it has two globstars. This side is read from the **git
-      index**, for the same nano-staged reason as the rule-source gate. It runs from the pre-commit hook and
-      from CI, and `CHECK_HELPERS_SYNC=0` turns it off for an offline run.
-    - The suites under `scripts/helpers/` run in the `unit-tests:scripts` vitest project. Without that
-      project nothing would collect them.
+- **`scripts/`** — npm script entry points (`jiti scripts/<name>.ts`), from `typescript-template`.
+  - **The tooling comes from the published `@mnaoumov` packages, not from copies.** Each entry point runs
+    inside `wrapCliTask` (`@mnaoumov/typescript-dev-toolkit/cli-utils`), which also carries the
+    per-script off switch (`LINT=0`, `FORMAT_CHECK=0`, and so on). ESLint, dprint and markdownlint run
+    through the toolkit's `linters/eslint`, `formatters/dprint` and `linters/markdownlint`. The custom
+    ESLint rules are the toolkit's `inHouseEslintPlugin`, registered under its own name so the rule ids
+    stay `obsidian-dev-utils/…`. Do not copy a helper back in. If a package lacks one, get it exported
+    there first.
+  - **`dev.ts` returns `CliTaskResult.DoNotExit()`.** Every other result exits the process when the task
+    resolves, which would kill the watcher and the server.
+  - **`helpers/site-build.ts` is the only helper left**, because it is specific to this site.
+  - **`linkinator.config.json` is load-bearing.** linkinator reads it from the working directory by itself,
+    so the toolkit's `lint:md` honours the skip list without being told. It has to be a file: repeating
+    `--skip` on the command line does not accumulate in this version of linkinator (the second occurrence
+    makes it skip *every* link and report a silent "scanned 0 links"). On Windows the tool also resolves to
+    a `.cmd` shim that re-parses its arguments, so a pattern holding `|` is split there as a pipe.
+  - **`markdownlint-cli2` and `markdownlint-rule-relative-links` are pinned exactly, at `0.23.2` and
+    `5.1.2`.** Their next releases move to `markdown-it` 15, which ships its own types. Once that copy is
+    hoisted, the rule's `index.d.ts` fails `tsc` under this repo's `skipLibCheck: false`
+    (`'MarkdownIt' refers to a value, but is being used as a type here`), because it was written against
+    `@types/markdown-it`. Lift both pins together once the rule's types work with `markdown-it` 15.
+  - **vitest is on 5 and esbuild on 0.28** because the toolkit's optional vitest peer is `^5.0.1`, and
+    vitest 5's vite needs esbuild `^0.27 || ^0.28`.
   - **`commitlint-private-references.ts` rejects commit messages that carry a private backlog id.** The
     repository is public, and exactly one pushed body (`56ad7eb`) already ends in such a trailer. The rule
     is registered in `commitlint-config.ts`, so `.husky/commit-msg` enforces it on every local commit. CI
