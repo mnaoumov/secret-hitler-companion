@@ -1,29 +1,24 @@
-import { join } from 'node:path/posix';
-
 import {
   checkProjectTypes,
   parseTsConfig,
   toCanonical
-} from './helpers/check-project-types.ts';
-import { exitIfScriptDisabled } from './helpers/env-toggle.ts';
+} from '@mnaoumov/typescript-dev-toolkit/check-project-types';
+import { wrapCliTask } from '@mnaoumov/typescript-dev-toolkit/cli-utils';
 import {
   execFromRoot,
   getRootFolder
-} from './helpers/root.ts';
-
-exitIfScriptDisabled();
+} from '@mnaoumov/typescript-dev-toolkit/root';
+import { join } from 'node:path/posix';
 
 const NODE_MODULES_SEGMENT = '/node_modules/';
 
-await main();
-
-async function main(): Promise<void> {
+await wrapCliTask(async () => {
   await execFromRoot('tsc --build --force');
 
   if (!validateProjectTypes()) {
     throw new Error('TypeScript declaration validation failed.');
   }
-}
+});
 
 function shouldKeepProjectFile(fileName: string, rootCanonical: string): boolean {
   return fileName.startsWith(`${rootCanonical}/`) && !fileName.includes(NODE_MODULES_SEGMENT);

@@ -4,10 +4,13 @@ import type {
   ServeResult
 } from 'esbuild';
 
+import {
+  CliTaskResult,
+  wrapCliTask
+} from '@mnaoumov/typescript-dev-toolkit/cli-utils';
 import { context } from 'esbuild';
 import process from 'node:process';
 
-import { exitIfScriptDisabled } from './helpers/env-toggle.ts';
 import {
   copyStaticFiles,
   getBuildOptions,
@@ -22,9 +25,14 @@ const ANY_PORT = 0;
 
 const STOP_SIGNALS = ['SIGINT', 'SIGTERM'] as const;
 
-exitIfScriptDisabled();
-
-await main();
+/*
+ * `DoNotExit`, because the watcher and the server have to outlive `main`: any other result exits the process
+ * as soon as `main` resolves. `registerShutdown` is what ends this one.
+ */
+await wrapCliTask(async () => {
+  await main();
+  return CliTaskResult.DoNotExit();
+});
 
 /** Keeps the served HTML and CSS in step with the bundle on every rebuild. */
 function copyStaticFilesPlugin(): Plugin {

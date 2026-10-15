@@ -1,13 +1,12 @@
 import type { BuildOptions } from 'esbuild';
 
+import { getRootFolder } from '@mnaoumov/typescript-dev-toolkit/root';
 import {
   cp,
   mkdir,
   rm
 } from 'node:fs/promises';
 import { join } from 'node:path/posix';
-
-import { getRootFolder } from './root.ts';
 
 const STATIC_FILES = ['index.html', 'styles.css'];
 
