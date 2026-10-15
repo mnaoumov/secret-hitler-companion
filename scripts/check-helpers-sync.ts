@@ -202,12 +202,11 @@ const ESLINT_RULES_PATH_PREFIX = 'scripts/helpers/eslint-rules/';
  * the two copies turn out identical outright, a side carries no `@file` block for the difference to be in, or
  * the bodies differ, which is drift the entry does not cover.
  *
- * This repo's one entry is that same pair: `git-content.test.ts`, whose header here is written about this
- * checkout and whose package name is reproduced by an arm.
+ * **Empty is the correct state for this repo today.** Its one entry was `git-content.test.ts`, until the peer
+ * made that suite repo-neutral - no header written about one checkout, no package name asserted as a literal -
+ * and this repo took its bytes whole.
  */
-const HEADER_ONLY_DIVERGENCES: Readonly<Record<string, string>> = {
-  'scripts/helpers/git-content.test.ts': 'The header describes the checkout the suite runs in: which peer the copy came from, and how many tracked files here carry a NUL byte (none, which is why the binary case builds a scratch repo). That is per-repo by nature, and the code under it is the peer\'s.'
-};
+const HEADER_ONLY_DIVERGENCES: Readonly<Record<string, string>> = {};
 
 const HELPERS_PATH_PREFIX = 'scripts/helpers/';
 
@@ -236,10 +235,6 @@ const LINKINATOR_CONFIG_ARGUMENTS = '    \'--config\',\n    LINKINATOR_CONFIG_FI
 const LINKINATOR_TOOL_LINE = '    ...resolveToolCommand({ tool: \'linkinator\' }),\n';
 
 const LINT_OPTIONS_LINE = 'interface LintOptions {\n';
-
-const PACKAGE_NAME_ASSERTION_PEER = 'expect(parsed.name).toBe(\'typescript-template\');';
-
-const PACKAGE_NAME_ASSERTION_LOCAL = 'expect(parsed.name).toBe(\'secret-hitler-companion\');';
 
 const PEER_RAW_BASE_URL = 'https://raw.githubusercontent.com/mnaoumov/typescript-template/main';
 
@@ -270,11 +265,6 @@ const TRANSFORM_ARMS: readonly TransformArm[] = [
     apply: (text) => text.replace(LINT_OPTIONS_LINE, () => `${LINKINATOR_CONFIG_BLOCK}\n${LINT_OPTIONS_LINE}`).replace(LINKINATOR_TOOL_LINE, () => `${LINKINATOR_TOOL_LINE}${LINKINATOR_CONFIG_ARGUMENTS}`),
     paths: ['scripts/helpers/markdownlint.ts'],
     reason: 'This repo hands linkinator its skip list through `linkinator.config.json`, which the peer has no equivalent of. The file is load-bearing: a repeated `--skip` does not accumulate in this linkinator version, and on Windows the `.cmd` shim splits a `|` in a pattern as a pipe. This is local intent, so it is reproduced rather than converged, and the rest of the file stays gated.'
-  },
-  {
-    apply: (text) => text.replace(PACKAGE_NAME_ASSERTION_PEER, () => PACKAGE_NAME_ASSERTION_LOCAL),
-    paths: ['scripts/helpers/git-content.test.ts'],
-    reason: 'The first case reads this repository\'s own staged `package.json` and asserts its name, which is this repo\'s rather than the peer\'s.'
   }
 ];
 
