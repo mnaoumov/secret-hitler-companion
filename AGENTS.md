@@ -143,8 +143,14 @@ the table could do itself and the thing every later number is read against.
   which is cheap at this size and removes a class of state bugs.
 - **`scripts/`** — npm script entry points (`jiti scripts/<name>.ts`), from `typescript-template`.
   - **`helpers/eslint-rules/` is vendored, not written here.** Every file in it is a hand-copy of
-    `obsidian-dev-utils`' published source, and `npm run check:vendored-eslint-rules` asserts byte-identity
-    after three recorded transform arms. Never hand-edit a copy: take the upstream change whole, or record
+    `obsidian-dev-utils`' published source under `packages/typescript-dev-toolkit/src/linters/eslint-rules/`
+    (`src/script-utils/linters/eslint-rules/` until the 2026-10-14 workspace split), and
+    `npm run check:vendored-eslint-rules` asserts byte-identity after three recorded transform arms:
+    `require-method-template` reads its named groups with the local `ensureNonNullable`; every
+    `@mnaoumov/typescript-lib/<module>` import becomes `../<module>.ts`, moved into the relative import group;
+    and upstream's inline `unicorn/…` disables are stripped, since this repo installs no `eslint-plugin-unicorn`.
+    That second arm is why `helpers/type-guards.ts` and `helpers/object-utils.ts` (the one `castTo` the
+    vendored `ts-estree-node.ts` calls) sit beside the tree. Never hand-edit a copy: take the upstream change whole, or record
     the delta as a transform arm in `scripts/check-vendored-eslint-rules.ts` so every later run enforces it.
     The gate walks for the FILE NAME rather than a fixed directory, lists upstream from the GitHub contents
     API rather than from a roster restated locally, and reads this side out of the **git index**
@@ -163,9 +169,8 @@ the table could do itself and the thing every later number is read against.
       measurement: `typescript-template` and `obsidian-test-mocks` each matched 6 of the 11 files here.
     - **`package-manager.ts` is carried**, with its suite, so `eslint.ts`, `format.ts` and `markdownlint.ts`
       run their tools through `resolveToolCommand` as the peer does rather than through a hand-spelt `npx`.
-    - **The recorded differences are all mechanical or header prose, and nothing is a whole-file
-      exception.** Three transform arms reproduce this repo's copy from the peer's, so the rest of each file
-      stays gated:
+    - **The recorded differences are all mechanical, and nothing is a whole-file exception.** Two transform
+      arms reproduce this repo's copy from the peer's, so the rest of each file stays gated:
       - **`root.ts`**: the peer's inline `unicorn/prefer-minimal-ternary` disable is stripped. ESLint fails
         a **whole run** on an unresolvable rule reference, and this repo installs no `eslint-plugin-unicorn`.
         The rule-source gate strips the same directive from the vendored rules.
@@ -175,8 +180,8 @@ the table could do itself and the thing every later number is read against.
         link and report a silent "scanned 0 links"), and on Windows the tool resolves to a `.cmd` shim that
         re-parses its arguments, so a pattern holding `|` is split there as a pipe. The helper's own comment
         says so. Keep both.
-      - **`git-content.test.ts`**: the package name its first case asserts. That file's `@file` header is
-        also written about this checkout, so it is compared with the header excluded from both sides.
+      - `git-content.test.ts` used to carry a third arm and a header-only entry. The peer made that suite
+        repo-neutral, so it is now taken byte for byte.
     - The roster is the whole tree minus `eslint-rules/`, including `@types/`, which the nano-staged key
       `**/helpers/**/*.ts` reaches only because it has two globstars. This side is read from the **git
       index**, for the same nano-staged reason as the rule-source gate. It runs from the pre-commit hook and

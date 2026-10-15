@@ -22,6 +22,7 @@ import type { Comment } from 'estree';
  * one three-line call site would invent a divergence axis no sibling has, so the local `ensureNonNullable` stays.
  */
 import { ensureNonNullable } from '../type-guards.ts';
+import { toTSESTreeNode } from './ts-estree-node.ts';
 
 interface JsdocSettings {
   tagNamePreference?: Record<string, string>;
@@ -49,7 +50,7 @@ export const requireMethodTemplate: Rule.RuleModule = {
 
     return {
       'MethodDefinition'(node: Rule.Node): void {
-        const methodNode = node as TSESTree.MethodDefinition;
+        const methodNode = toTSESTreeNode(node) as TSESTree.MethodDefinition;
         const functionExpression = methodNode.value;
 
         const typeParams = functionExpression.typeParameters?.params;
@@ -116,7 +117,7 @@ interface ParsedTag {
 }
 
 /**
- * Parameters for {@link parseTypeParamTags}.
+ * Parameters for {@link parseTypeParameterTags}.
  */
 interface ParseTypeParameterTagsParams {
   /**

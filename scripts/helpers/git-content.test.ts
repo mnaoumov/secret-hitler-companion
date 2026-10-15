@@ -1,32 +1,32 @@
 /**
  * @file
  *
- * Tests for the index read both of this repo's byte-identity gates depend on --
- * `check:vendored-eslint-rules` and `check:helpers-sync`.
+ * Tests for the index read this repo's byte-identity gates depend on.
  *
- * Taken from `typescript-template` on 2026-09-23, the peer `check:helpers-sync` compares this roster against.
- * The code is the peer's. Two things differ, and both are recorded in that gate: this `@file` header, which is
- * per-repo prose, and the package name the first case asserts, which is reproduced by a transform arm.
+ * **This file is repo-neutral on purpose, and carried byte-identical by `obsidian-test-mocks` and
+ * `typescript-template`.** Every fixture that could name one repo - its package name, a binary asset only it
+ * tracks - is derived instead, so no copy needs a recorded divergence from another. Keep it that way: a
+ * case that asserts something only true of one checkout belongs in that checkout's own suite, not here.
  *
  * The fixture for everything that can use it is **this repository's own index** rather than a scratch repo:
  * those properties are properties of how `git cat-file` hands bytes back, and a repo built for the test would
  * prove them about that repo rather than about the checkout the gates actually run in.
  *
- * The two that matter most are the two reasons `readIndexContent` does not go through `execFromRoot` -- a
+ * The two that matter most are the two reasons `readIndexContent` does not go through `execFromRoot` - a
  * binary blob survives, and a trailing newline is not eaten. Both are silent failures waiting to happen: the
- * second would report every vendored rule source as differing from upstream by its last line.
+ * first would move the recorded digest of any binary a gate compares by hash, and the second would report
+ * every compared text file as differing from upstream by its last line.
  *
- * ## The binary case builds a scratch repo
+ * **The binary property is asserted twice, and neither copy is redundant.** A repo that tracks no binary has
+ * no fixture in its own index for it, so one case builds a scratch repo holding a blob of known bytes - the
+ * one departure from the own-index rule, and a deliberate one: a primitive whose exactness depends on which
+ * files a caller hands it is the wrong thing to build on. The other case asserts it over every blob git
+ * itself classifies as binary in THIS index, which is the fixture rule applied as far as it reaches, and is
+ * reported skipped rather than vacuously green where that set is empty.
  *
- * Measured 2026-09-23, **none of this repo's 89 tracked files contains a NUL byte**, so the fixture rule above
- * cannot reach that property here. It is the one case that builds a scratch repo, which is also what the peer
- * does, for the same reason.
- *
- * ## Outside a repository
- *
- * A path git cannot find and a folder that is not a repository both exit 128, and `isMissingPath` tells them
- * apart by the message alone: the first is reported as an absent blob, the second is thrown. The last case
- * pins that distinction.
+ * **A path git cannot find and a folder that is not a repository both exit 128**, and `isMissingPath` tells
+ * them apart by the message alone: the first is reported as an absent blob, the second is thrown. The last
+ * case pins that distinction, which the prose around `isMissingPath` is entirely about.
  */
 
 import { Buffer } from 'node:buffer';
@@ -75,13 +75,19 @@ const BINARY_FIXTURE_CONTENT = Buffer.from([0x41, 0x42, 0x00, 0x01, 0xFE, 0xFF, 
 
 const GIT_EXIT_FATAL = 128;
 
+/*
+ * How `git ls-files --eol` reports a blob whose index content git classifies as binary - by the same NUL test
+ * it uses to decide what to diff and what to convert.
+ */
+const INDEX_BINARY_MARKER = 'i/-text';
+
 let scratchRepoFolder = '';
 let nonRepoFolder = '';
 
 /**
  * Asserts a folder is outside every git repository, which the non-repository case below assumes of `tmpdir()`.
  *
- * The walk is `getRootFolder`'s, looking for `.git` instead of `package.json` -- i.e. the same search git
+ * The walk is `getRootFolder`'s, looking for `.git` instead of `package.json` - i.e. the same search git
  * itself reports as "not a git repository (or any of the parent directories)". A temp folder inside a
  * repository would make that case assert the missing-path branch instead, and pass for the wrong reason, so
  * it is worth a sentence rather than a silent pass.
@@ -102,6 +108,37 @@ function assertOutsideRepo(folder: string): void {
 
     currentFolder = parentFolder;
   }
+}
+
+/**
+ * Lists the paths whose index blob git classifies as binary.
+ *
+ * Git's own classification rather than a NUL scan of every tracked file here: it is one call, and it is the
+ * definition every other part of git - `diff`, `text=auto` conversion - already answers to.
+ *
+ * @param root - The repository root.
+ * @returns The posix-spelled, repo-relative paths, sorted by git.
+ */
+function listTrackedBinaries(root: string): string[] {
+  const result = spawnSync('git', ['-C', root, 'ls-files', '--eol', '-z'], { windowsHide: true });
+  if (result.error) {
+    throw new Error(`Could not run \`git ls-files\` in ${root}.`, { cause: result.error });
+  }
+
+  if (result.status !== 0) {
+    throw new Error(`\`git ls-files\` failed in ${root}:\n${result.stderr.toString('utf-8').trim()}`);
+  }
+
+  const paths: string[] = [];
+  for (const entry of result.stdout.toString('utf-8').split('\0')) {
+    // The path is everything after the first tab; `-z` means it is not quoted and may itself hold one.
+    const tabIndex = entry.indexOf('\t');
+    if (tabIndex !== -1 && entry.startsWith(INDEX_BINARY_MARKER)) {
+      paths.push(entry.slice(tabIndex + 1));
+    }
+  }
+
+  return paths;
 }
 
 /**
@@ -177,11 +214,19 @@ afterAll(() => {
 
 describe('readIndexContent', () => {
   const root = toPosixPath(getRootFolder() ?? '');
+  const trackedBinaries = listTrackedBinaries(root);
 
   it('reads a tracked text file as the bytes a commit would write', async () => {
     const content = await readTracked(root, 'package.json');
     const parsed = JSON.parse(content.toString('utf-8')) as PackageManifest;
-    expect(parsed.name).toBe('secret-hitler-companion');
+
+    /*
+     * The working tree's manifest is the oracle rather than a literal, so the case names no repo. A package
+     * is not renamed mid-edit, so the two agree whenever the staged file really is `package.json`.
+     */
+    const onDisk = JSON.parse(readFileSync(join(root, 'package.json'), 'utf-8')) as PackageManifest;
+    expect(parsed.name).not.toBe('');
+    expect(parsed.name).toBe(onDisk.name);
   });
 
   it('keeps the trailing newline, which a stdout-trimming exec helper would eat', async () => {
@@ -189,7 +234,7 @@ describe('readIndexContent', () => {
     expect(content.toString('utf-8').endsWith('}\n')).toBe(true);
   });
 
-  it('returns a binary file byte for byte', async () => {
+  it('returns a binary blob byte for byte', async () => {
     const staged = await readTracked(scratchRepoFolder, BINARY_FIXTURE_NAME);
     expect(staged.includes(0)).toBe(true);
     expect(staged.equals(BINARY_FIXTURE_CONTENT)).toBe(true);
@@ -201,6 +246,20 @@ describe('readIndexContent', () => {
      */
     const onDisk = readFileSync(join(scratchRepoFolder, BINARY_FIXTURE_NAME));
     expect(staged.equals(onDisk)).toBe(true);
+  });
+
+  it.skipIf(trackedBinaries.length === 0)('returns every binary this repository tracks byte for byte', async () => {
+    for (const path of trackedBinaries) {
+      const staged = await readTracked(root, path);
+
+      /*
+       * A tracked binary is an asset nothing edits, so its staged bytes and its bytes on disk are the same
+       * file - the working tree is the oracle. The NUL check is what makes it a binary case at all: git's
+       * classification is by the same test.
+       */
+      expect(staged.includes(0), path).toBe(true);
+      expect(staged.equals(readFileSync(join(root, path))), path).toBe(true);
+    }
   });
 
   it('answers null for a path with no index entry, rather than throwing', async () => {
