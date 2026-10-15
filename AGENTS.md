@@ -140,7 +140,6 @@ the table could do itself and the thing every later number is read against.
 - **`src/ui/`** — vanilla TS, no framework. `main.ts` re-renders the whole tree on every change,
   which is cheap at this size and removes a class of state bugs.
 - **`scripts/`** — npm script entry points (`jiti scripts/<name>.ts`), from `typescript-template`.
-- **`scripts/`** — npm script entry points (`jiti scripts/<name>.ts`), from `typescript-template`.
   - **The tooling comes from the published `@mnaoumov` packages, not from copies.** Each entry point runs
     inside `wrapCliTask` (`@mnaoumov/typescript-dev-toolkit/cli-utils`), which also carries the
     per-script off switch (`LINT=0`, `FORMAT_CHECK=0`, and so on). ESLint, dprint and markdownlint run
