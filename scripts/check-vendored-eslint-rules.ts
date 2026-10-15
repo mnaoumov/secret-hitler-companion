@@ -6,7 +6,8 @@
  * This repo resolves no dependency on `obsidian-dev-utils` - it is scaffolded from `typescript-template`,
  * not a consumer of that library - so the custom rules it lints itself with are hand-copied out of that
  * repo's
- * `src/script-utils/linters/eslint-rules/` rather than imported. Nothing kept the copies honest, and they had
+ * `packages/typescript-dev-toolkit/src/linters/eslint-rules/` rather than imported. (Until the 2026-10-14 split into
+ * workspace packages they lived in `src/script-utils/linters/eslint-rules/`.) Nothing kept the copies honest, and they had
  * aged apart in three directions at once: refinements upstream made and no copy took, a local autofix
  * rewriting a copy in place, and a copy whose behavior had quietly diverged from the rule it is named after.
  *
@@ -70,6 +71,7 @@ import {
   getRootFolder,
   toPosixPath
 } from './helpers/root.ts';
+import { ensureNonNullable } from './helpers/type-guards.ts';
 
 /**
  * What an arm does to upstream's text.
@@ -113,6 +115,8 @@ interface VendoredText {
   text: string;
 }
 
+const EMPTIED_GROUP_PATTERN = /\n{3,}/g;
+
 const HTTP_STATUS_NOT_FOUND = 404;
 
 const IGNORED_DIRECTORY_NAMES = new Set([
@@ -121,6 +125,14 @@ const IGNORED_DIRECTORY_NAMES = new Set([
   'dist',
   'node_modules'
 ]);
+
+/*
+ * Every import statement, and every single-line import of one of upstream's own library helpers. An import
+ * statement holds no `;` before its own, so `[^;]` keeps a match inside one statement however many lines it spans.
+ */
+const IMPORT_STATEMENT_PATTERN = /^import [^;]*;\n/gm;
+
+const LIBRARY_IMPORT_PATTERN = /^import \{ (?<names>[^}]+) \} from '@mnaoumov\/typescript-lib\/(?<moduleName>[\w-]+)';\n/gm;
 
 /*
  * This repo's reading of `require-method-template.ts`'s named groups, and the import that serves it. See
@@ -152,29 +164,33 @@ const REGISTRATION_FILE_NAMES = new Set([
  * The recorded divergences, in the order they are applied. Any difference an arm does not account for is
  * drift and is reported.
  */
+// The first relative value import - a type import sits in a group of its own, which the local import does not join.
+const RELATIVE_IMPORT_PATTERN = /^import (?!type )[^;]*? from '\.{1,2}\/[^']*';\n/m;
+
 const TRANSFORM_ARMS: readonly TransformArm[] = [
   {
-    apply: (text) => text.replaceAll('\'../../../type-guards.ts\'', '\'../type-guards.ts\''),
+    // The replacements are passed as functions rather than as strings so that no `$`-sequence in them is read as a capture-group reference.
+    apply: (text) => text.replace(UPSTREAM_REG_EXP_IMPORT, () => `${LOCAL_TYPE_GUARDS_IMPORT}\n`).replace(UPSTREAM_NAMED_GROUP_READS, () => LOCAL_NAMED_GROUP_READS),
+    fileNames: ['require-method-template.ts'],
+    reason: 'Upstream reads this rule\'s named groups with `getMandatoryNamedGroup` from `@mnaoumov/typescript-lib/reg-exp`, a 238-line module carrying an enum, a flag-merger class and `oneOf`. Vendoring all of that for one three-line call site would invent a divergence axis no sibling has, so the local `ensureNonNullable` serves instead. No `@obsidian` sibling vendors this rule, which is why none of them carries this arm. It runs before the library-import arm, which would otherwise rewrite the import it matches.'
+  },
+  {
+    apply: localizeLibraryImports,
     fileNames: [],
-    reason: 'Upstream sits three levels under `src/script-utils/`, so it reaches `type-guards.ts` by `../../../`. A vendored tree sits directly beside its copy of that helper.'
+    reason: 'Upstream imports its helpers from `@mnaoumov/typescript-lib/<module>`, a package this repo does not depend on. A vendored tree reaches its local copy of each helper at `../<module>.ts` instead, and that import moves into the relative group, where `perfectionist/sort-imports` puts it.'
   },
   {
     apply: (text) => text.split('\n').filter((line) => !UNICORN_DISABLE_LINE_PATTERN.test(line)).join('\n'),
     fileNames: [],
     reason: 'Upstream carries inline `unicorn/…` disables, and this repo installs no `eslint-plugin-unicorn` at all - ESLint fails a WHOLE run on an unresolvable rule reference, and a file-scoped `\'unicorn/…\': \'off\'` override fails the same way, so stripping the line is the only shape available. This arm takes every file rather than a named one, because the rules that carry such a line upstream are not a fixed set: today they are `no-async-callback-to-unsafe-return.ts` and `require-method-template.ts`.'
-  },
-  {
-    apply: (text) => text.replace(UPSTREAM_REG_EXP_IMPORT, () => LOCAL_TYPE_GUARDS_IMPORT).replace(UPSTREAM_NAMED_GROUP_READS, () => LOCAL_NAMED_GROUP_READS),
-    fileNames: ['require-method-template.ts'],
-    reason: 'Upstream reads this rule\'s named groups with `getMandatoryNamedGroup` from its own `reg-exp.ts`, a 238-line module carrying an enum, a flag-merger class and `oneOf`. Vendoring all of that for one three-line call site would invent a divergence axis no sibling has, so the local `ensureNonNullable` serves instead. No `@obsidian` sibling vendors this rule, which is why none of them carries this arm.'
   }
 ];
 
 const UNICORN_DISABLE_LINE_PATTERN = /^\s*\/\/ eslint-disable-next-line unicorn\//;
 
-const UPSTREAM_BASE_URL = 'https://raw.githubusercontent.com/mnaoumov/obsidian-dev-utils/main/src/script-utils/linters/eslint-rules';
+const UPSTREAM_BASE_URL = 'https://raw.githubusercontent.com/mnaoumov/obsidian-dev-utils/main/packages/typescript-dev-toolkit/src/linters/eslint-rules';
 
-const UPSTREAM_LISTING_URL = 'https://api.github.com/repos/mnaoumov/obsidian-dev-utils/contents/src/script-utils/linters/eslint-rules?ref=main';
+const UPSTREAM_LISTING_URL = 'https://api.github.com/repos/mnaoumov/obsidian-dev-utils/contents/packages/typescript-dev-toolkit/src/linters/eslint-rules?ref=main';
 
 /*
  * Upstream's two reads of `require-method-template.ts`'s named groups, and the import that serves them. Both
@@ -185,7 +201,11 @@ const UPSTREAM_LISTING_URL = 'https://api.github.com/repos/mnaoumov/obsidian-dev
 const UPSTREAM_NAMED_GROUP_READS = `    const name = getMandatoryNamedGroup(match, 'typeName');
     const rest = getMandatoryNamedGroup(match, 'rest').trim();`;
 
-const UPSTREAM_REG_EXP_IMPORT = 'import { getMandatoryNamedGroup } from \'../../../reg-exp.ts\';';
+/*
+ * The blank line after it is part of the match: upstream's import is alone in its group, and the local import
+ * that replaces it joins the relative group below it, with no blank line in between.
+ */
+const UPSTREAM_REG_EXP_IMPORT = 'import { getMandatoryNamedGroup } from \'@mnaoumov/typescript-lib/reg-exp\';\n\n';
 
 const failures: string[] = [];
 
@@ -331,6 +351,41 @@ async function getUpstreamFileNames(): Promise<Set<string>> {
   }
 
   return names;
+}
+
+/**
+ * Rewrites each single-line `@mnaoumov/typescript-lib/<module>` import into the local `../<module>.ts` one, in
+ * the place `perfectionist/sort-imports` puts it.
+ *
+ * Upstream's import sits among the external value imports, alone in its group or beside others. The local one is
+ * a parent import, so it joins the relative group: right before upstream's first relative import when there is
+ * one, which is a `./` sibling and so sorts after it; otherwise as a group of its own after the last import. A
+ * group the removal empties takes its blank line with it.
+ *
+ * @param text - Upstream's bytes, after any arm that runs before this one.
+ * @returns The same text with every library import localized.
+ */
+function localizeLibraryImports(text: string): string {
+  const localImports = Array.from(text.matchAll(LIBRARY_IMPORT_PATTERN), (match) => {
+    const groups = ensureNonNullable(match.groups);
+    return `import { ${ensureNonNullable(groups['names'])} } from '../${ensureNonNullable(groups['moduleName'])}.ts';\n`;
+  });
+
+  if (localImports.length === 0) {
+    return text;
+  }
+
+  // Upstream is formatted, so it never holds two blank lines in a row: a run of them is a group this emptied.
+  const result = text.replaceAll(LIBRARY_IMPORT_PATTERN, '').replaceAll(EMPTIED_GROUP_PATTERN, '\n\n');
+  const localBlock = localImports.toSorted((left, right) => left.localeCompare(right)).join('');
+
+  const firstRelativeImport = RELATIVE_IMPORT_PATTERN.exec(result);
+  if (firstRelativeImport !== null) {
+    return result.slice(0, firstRelativeImport.index) + localBlock + result.slice(firstRelativeImport.index);
+  }
+
+  const lastImportEnd = Math.max(...Array.from(result.matchAll(IMPORT_STATEMENT_PATTERN), (match) => match.index + match[0].length));
+  return `${result.slice(0, lastImportEnd)}\n${localBlock}${result.slice(lastImportEnd)}`;
 }
 
 async function main(): Promise<void> {
