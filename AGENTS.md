@@ -155,11 +155,6 @@ the table could do itself and the thing every later number is read against.
     `--skip` on the command line does not accumulate in this version of linkinator (the second occurrence
     makes it skip *every* link and report a silent "scanned 0 links"). On Windows the tool also resolves to
     a `.cmd` shim that re-parses its arguments, so a pattern holding `|` is split there as a pipe.
-  - **`markdownlint-cli2` and `markdownlint-rule-relative-links` are pinned exactly, at `0.23.2` and
-    `5.1.2`.** Their next releases move to `markdown-it` 15, which ships its own types. Once that copy is
-    hoisted, the rule's `index.d.ts` fails `tsc` under this repo's `skipLibCheck: false`
-    (`'MarkdownIt' refers to a value, but is being used as a type here`), because it was written against
-    `@types/markdown-it`. Lift both pins together once the rule's types work with `markdown-it` 15.
   - **vitest is on 5 and esbuild on 0.28** because the toolkit's optional vitest peer is `^5.0.1`, and
     vitest 5's vite needs esbuild `^0.27 || ^0.28`.
   - **`commitlint-private-references.ts` rejects commit messages that carry a private backlog id.** The
