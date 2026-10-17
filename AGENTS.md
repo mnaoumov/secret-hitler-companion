@@ -158,11 +158,12 @@ the table could do itself and the thing every later number is read against.
   - **vitest is on 5 and esbuild on 0.28** because the toolkit's optional vitest peer is `^5.0.1`, and
     vitest 5's vite needs esbuild `^0.27 || ^0.28`.
   - **`commitlint-private-references.ts` rejects commit messages that carry a private backlog id.** The
-    repository is public, and exactly one pushed body (`56ad7eb`) already ends in such a trailer. The rule
-    is registered in `commitlint-config.ts`, so `.husky/commit-msg` enforces it on every local commit. CI
-    lints each pushed or pull-requested range again, since `--no-verify` and a commit from another checkout
-    both skip the hook. It lints only the new range, never the whole history, so that one commit does not
-    fail every build. The shapes are narrow on purpose: a bare id must have three or more digits, so that
+    repository is public, and one pushed body once ended in such a trailer, until a 2026-10-17 force-push
+    reworded it. The rule is registered in `commitlint-config.ts`, so `.husky/commit-msg` enforces it on
+    every local commit. CI lints each pushed or pull-requested range again, since `--no-verify` and a commit
+    from another checkout both skip the hook. It lints only the new range, never the whole history. After a
+    force-push the push's `before` commit is gone from the clone, so CI lints only the new tip rather than
+    throwing on an invalid range. The shapes are narrow on purpose: a bare id must have three or more digits, so that
     type parameters such as `Result<T1, E>` are not caught. **There is no unit test on purpose.** A positive
     fixture would have to ship the very tokens the rule rejects. Verify a change by piping a message into
     `npx commitlint`.

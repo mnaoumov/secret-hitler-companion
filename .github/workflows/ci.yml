@@ -34,11 +34,11 @@ jobs:
         run: npm ci
 
       # `.husky/commit-msg` lints every local commit, but `--no-verify` skips it and a commit made in
-      # another checkout never meets it — which is how the one message carrying a private backlog id
-      # reached `main`. So the pushed range is linted again here. Only the NEW commits: the history
-      # before this step existed holds that one message, and rewriting published history is a separate
-      # decision from guarding against the next one. A push that creates a branch has no `before`, and a
-      # manual run has no range at all.
+      # another checkout never meets it — which is how a message carrying a private backlog id once
+      # reached `main`. So the pushed range is linted again here, and only the NEW commits. A push that
+      # creates a branch has no `before`, and a manual run has no range at all. After a force-push,
+      # `before` names a commit the rewrite dropped, so it is not in the clone and `--from` would throw
+      # `Invalid revision range`; the pushed range is unknowable then, so only the tip is linted.
       - name: Lint commit messages
         env:
           EVENT_NAME: ${{ github.event_name }}
@@ -50,10 +50,13 @@ jobs:
             npx --no -- commitlint --from "$PR_BASE" --to "$PR_HEAD" --verbose
           elif [ "$EVENT_NAME" = workflow_dispatch ]; then
             echo 'A manual run adds no commits; the ones it builds were linted when they were pushed.'
-          elif [ -n "$PUSH_BEFORE" ] && [ "$PUSH_BEFORE" != 0000000000000000000000000000000000000000 ]; then
+          elif [ -z "$PUSH_BEFORE" ] || [ "$PUSH_BEFORE" = 0000000000000000000000000000000000000000 ]; then
+            echo 'No previous commit to compare against; nothing to lint.'
+          elif git cat-file -e "$PUSH_BEFORE^{commit}" 2>/dev/null; then
             npx --no -- commitlint --from "$PUSH_BEFORE" --to "$GITHUB_SHA" --verbose
           else
-            echo 'No previous commit to compare against; nothing to lint.'
+            echo "The previous tip $PUSH_BEFORE is not in the clone (a force-push); linting the new tip only."
+            git log -1 --format=%B "$GITHUB_SHA" | npx --no -- commitlint --verbose
           fi
 
       - name: Type check
