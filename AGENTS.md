@@ -144,8 +144,8 @@ the table could do itself and the thing every later number is read against.
     inside `wrapCliTask` (`@mnaoumov/typescript-dev-toolkit/cli-utils`), which also carries the
     per-script off switch (`LINT=0`, `FORMAT_CHECK=0`, and so on). ESLint, dprint and markdownlint run
     through the toolkit's `linters/eslint`, `formatters/dprint` and `linters/markdownlint`. The custom
-    ESLint rules are the toolkit's `inHouseEslintPlugin`, registered under its own name so the rule ids
-    stay `obsidian-dev-utils/…`. Do not copy a helper back in. If a package lacks one, get it exported
+    ESLint rules are the toolkit's `inHouseEslintPlugin`, registered under the toolkit's
+    `IN_HOUSE_ESLINT_PLUGIN_NAME`, so the rule ids read `typescript-dev-toolkit/…`. Do not copy a helper back in. If a package lacks one, get it exported
     there first.
   - **`dev.ts` returns `CliTaskResult.DoNotExit()`.** Every other result exits the process when the task
     resolves, which would kill the watcher and the server.
@@ -157,6 +157,9 @@ the table could do itself and the thing every later number is read against.
     a `.cmd` shim that re-parses its arguments, so a pattern holding `|` is split there as a pipe.
   - **vitest is on 5 and esbuild on 0.28** because the toolkit's optional vitest peer is `^5.0.1`, and
     vitest 5's vite needs esbuild `^0.27 || ^0.28`.
+  - **`skipLibCheck` is `true`, and `build-compile.ts` re-checks the project's own files with it off.** markdownlint
+    0.42 (the toolkit's) ships a `resolve-module.d.cts` that fails `TS2309`, which no setting of ours can fix. The
+    second pass prints `Ignored N diagnostic(s) outside the validated set.`; once `N` is `0`, flip it back to `false`.
   - **`commitlint-private-references.ts` rejects commit messages that carry a private backlog id.** The
     repository is public, and one pushed body once ended in such a trailer, until a 2026-10-17 force-push
     reworded it. The rule is registered in `commitlint-config.ts`, so `.husky/commit-msg` enforces it on

@@ -76,11 +76,11 @@ function getCustomPluginConfigs(): Linter.Config[] {
         [IN_HOUSE_ESLINT_PLUGIN_NAME]: inHouseEslintPlugin
       },
       rules: {
-        'obsidian-dev-utils/no-unused-params-members': 'error',
-        'obsidian-dev-utils/no-used-underscore-variables': 'error',
-        'obsidian-dev-utils/params-options-name-match': 'error',
-        'obsidian-dev-utils/readonly-params-options-result-members': 'error',
-        'obsidian-dev-utils/require-method-template': 'error'
+        'typescript-dev-toolkit/no-unused-params-members': 'error',
+        'typescript-dev-toolkit/no-used-underscore-variables': 'error',
+        'typescript-dev-toolkit/params-options-name-match': 'error',
+        'typescript-dev-toolkit/readonly-params-options-result-members': 'error',
+        'typescript-dev-toolkit/require-method-template': 'error'
       }
     }
   ]);
@@ -625,8 +625,8 @@ function getTseslintConfigs(): Linter.Config[] {
           }
         ],
         '@typescript-eslint/prefer-readonly': 'error',
-        'obsidian-dev-utils/no-async-callback-to-unsafe-return': 'error',
-        'obsidian-dev-utils/no-used-underscore-variables': 'error'
+        'typescript-dev-toolkit/no-async-callback-to-unsafe-return': 'error',
+        'typescript-dev-toolkit/no-used-underscore-variables': 'error'
       }
     }
   ]);
