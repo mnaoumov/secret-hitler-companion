@@ -45,12 +45,12 @@ interface PrivateReferenceMatch {
   /**
    * The {@link PrivateReferencePattern.description} of the shape that matched.
    */
-  description: string;
+  readonly description: string;
 
   /**
    * The matched text, quoted back so the committer can find it in the message.
    */
-  text: string;
+  readonly text: string;
 }
 
 /**
@@ -60,12 +60,12 @@ interface PrivateReferencePattern {
   /**
    * What this shape is, phrased for the failure message a committer reads.
    */
-  description: string;
+  readonly description: string;
 
   /**
    * The shape itself.
    */
-  regExp: RegExp;
+  readonly regExp: RegExp;
 }
 
 /**

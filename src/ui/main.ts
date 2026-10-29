@@ -57,6 +57,7 @@ import {
   textInput
 } from './dom.ts';
 
+/* eslint-disable typescript-dev-toolkit/readonly-interface-members -- AppState and Draft are the app's live state, which every handler updates in place before re-rendering. */
 interface AppState {
   draft: Draft;
 
@@ -163,6 +164,7 @@ interface Draft {
   /** Whether the executed player turned out to be Hitler. The rules force a truthful answer. */
   wasExecutedPlayerHitler?: boolean | undefined;
 }
+/* eslint-enable typescript-dev-toolkit/readonly-interface-members -- The block above holds the two mutable state interfaces only. */
 
 /** Everything the readout needs, whether it is showing the draft or a round from the history. */
 /**
