@@ -10,6 +10,13 @@
     "that is actually present in the declared section; the script reports either mismatch."
   ],
   "pins": {
+    "katex": {
+      "section": "overrides",
+      "why": "Clears GHSA-238p-pmpm-9mq7 (KaTeX prototype pollution bypassing trust restrictions, 0.11.0 - 0.18.1). Reached only through markdownlint's micromark-extension-math, which still requests ^0.16.0, so no lockfile update reaches the fix. NEVER take the `npm audit fix --force` remedy: it downgrades markdownlint and the toolkit packages. The markdown lint gate verifies this override.",
+      "check": "npm view micromark-extension-math@latest dependencies.katex",
+      "expect": "^0.16.0",
+      "manualCheck": "When micromark-extension-math's latest release requests katex ^0.18.2 or later, drop the override and this entry and re-run `npm audit`."
+    },
     "re2js": {
       "section": "overrides",
       "why": "Clears GHSA-gg6h-894w-4m9c (RE2JS quadratic-time denial of service in lookbehind matching, >=2.2.0 <2.8.7). Reached only through markdownlint, whose newest release 0.42.0 pins re2js at the exact 2.8.6, and markdownlint-cli2 0.24.0 pins that markdownlint exactly in turn, so no bump reaches the fix. 2.9.1 is the version markdownlint itself moved to upstream, so the forced minor is the one it is tested against. NEVER take the `npm audit fix --force` remedy: it downgrades the toolkit packages.",
